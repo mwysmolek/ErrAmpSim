@@ -4,10 +4,12 @@ A batch is a base configuration (fibre datasheet, pump, seed, numerics) plus a s
 of sweep axes. Each axis is written as ``start:stop:step`` (stop included), a
 comma list ``a, b, c``, or a single value. The cases are the Cartesian product of
 all axes. Every case runs in its own worker process (``python -m fibamp.batch
---worker``), so a crash or a hang in one case cannot take the batch down, and the
-batch keeps going on all CPU cores.
+--worker IN OUT``, or ``kayei_ampstudio.exe --batch-worker IN OUT`` in the packaged
+app), so a crash or a hang in one case cannot take the batch down, and the batch
+keeps going on all CPU cores. Job and result travel as files: a windowed exe has no
+usable stdout.
 
-Results are stored under ``~/fibamp/batches/<name>/``: ``batch.json`` (setup),
+Results are stored under ``<data folder>/batches/<name>/``: ``batch.json`` (setup),
 ``results.jsonl`` (one line per case, written as cases finish, so an interrupted
 batch keeps what it has) and the reports written by :mod:`fibamp.report`.
 
@@ -23,13 +25,28 @@ import math
 import os
 import subprocess
 import sys
+import tempfile
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
 import numpy as np
 
-BATCH_DIR = os.path.join(os.path.expanduser("~"), "fibamp", "batches")
+from .paths import is_frozen, sub
+
+
+def batch_root() -> str:
+    """Folder holding every batch (inside the portable data folder, see :mod:`fibamp.paths`)."""
+    return str(sub("batches"))
+
+
+def worker_command() -> list:
+    """How to start one worker: the packaged exe re-runs itself, a source install uses -m."""
+    if is_frozen():
+        return [sys.executable, "--batch-worker"]
+    return [sys.executable, "-m", "fibamp.batch", "--worker"]
+
 
 # axis key -> (label, unit, where it goes)
 AXES = {
@@ -231,15 +248,28 @@ def run_case(job: dict) -> dict:
     return out
 
 
-def _worker_main():
-    job = json.loads(sys.stdin.read())
+def _worker_main(args=()):
+    """``--worker IN OUT`` reads the job from file IN and writes the result to OUT;
+    ``--worker`` alone uses stdin / stdout."""
+    args = list(args)
+    if len(args) >= 2:
+        with open(args[0], encoding="utf-8") as fh:
+            job = json.load(fh)
+    else:
+        job = json.loads(sys.stdin.read())
     try:
         out = run_case(job)
     except Exception as e:                       # noqa: BLE001 -- report, never crash the batch
         import traceback
         out = dict(index=job["index"], values=job["values"], ok=False, error=f"{type(e).__name__}: {e}",
                    trace=traceback.format_exc()[-1500:])
-    sys.stdout.write("RESULT" + json.dumps(out) + "\n")
+    if len(args) >= 2:
+        tmp = args[1] + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(out, fh)
+        os.replace(tmp, args[1])
+    else:
+        sys.stdout.write("RESULT" + json.dumps(out) + "\n")
 
 
 # --------------------------------------------------------------- the batch
@@ -262,7 +292,7 @@ def custom_tables(spec: BatchSpec):
 
 def batch_dir(name):
     safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in name).strip("_") or "batch"
-    return os.path.join(BATCH_DIR, safe)
+    return os.path.join(batch_root(), safe)
 
 
 def save_spec(spec: BatchSpec, folder=None) -> str:
@@ -287,17 +317,19 @@ def load_batch(folder):
 
 
 def list_batches():
-    if not os.path.isdir(BATCH_DIR):
-        return []
+    root = batch_root()
     out = []
-    for d in sorted(os.listdir(BATCH_DIR)):
-        if os.path.exists(os.path.join(BATCH_DIR, d, "batch.json")):
+    for d in sorted(os.listdir(root)):
+        if os.path.exists(os.path.join(root, d, "batch.json")):
             out.append(d)
     return out
 
 
-def run_batch(spec: BatchSpec, workers=None, progress=None, folder=None, timeout_s=3600, resume=True):
-    """Run every case; returns the list of result rows (also written to results.jsonl as they finish)."""
+def run_batch(spec: BatchSpec, workers=None, progress=None, folder=None, timeout_s=3600, resume=True, stop=None):
+    """Run every case; returns the list of result rows (also written to results.jsonl as they finish).
+
+    ``stop``: a threading.Event; once set, running workers are killed and no new case starts. The
+    finished cases stay in results.jsonl and a later run with resume=True picks up the rest."""
     folder = folder or batch_dir(spec.name)
     os.makedirs(folder, exist_ok=True)
     spec.custom_xs = custom_tables(spec)
@@ -320,17 +352,48 @@ def run_batch(spec: BatchSpec, workers=None, progress=None, folder=None, timeout
                OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1")
     sd = spec.to_dict()
 
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)    # no console window flashing up per case
+    stop = stop or threading.Event()
+    jobs_dir = tempfile.mkdtemp(prefix="jobs-", dir=folder)
+
     def one(i, values):
+        if stop.is_set():
+            return None
         job = dict(spec=sd, values=values, index=i, custom_xs=spec.custom_xs)
+        jin = os.path.join(jobs_dir, f"case-{i}.json")
+        jout = os.path.join(jobs_dir, f"case-{i}.out.json")
+        with open(jin, "w", encoding="utf-8") as fh:
+            json.dump(job, fh)
+        err_path = jin + ".err"
         try:
-            p = subprocess.run([sys.executable, "-m", "fibamp.batch", "--worker"], input=json.dumps(job),
-                               capture_output=True, text=True, timeout=timeout_s, env=env, cwd=pkg_root)
-            line = [l for l in p.stdout.splitlines() if l.startswith("RESULT")]
-            if line:
-                return json.loads(line[0][6:])
-            return dict(index=i, values=values, ok=False, error=(p.stderr.strip().splitlines() or ["worker died"])[-1])
-        except subprocess.TimeoutExpired:
-            return dict(index=i, values=values, ok=False, error=f"timed out after {timeout_s:.0f} s")
+            with open(err_path, "w", encoding="utf-8") as err:
+                p = subprocess.Popen([*worker_command(), jin, jout], stdin=subprocess.DEVNULL,
+                                     stdout=subprocess.DEVNULL, stderr=err, env=env, cwd=pkg_root,
+                                     creationflags=flags)
+                t_start = time.time()
+                while p.poll() is None:
+                    if stop.is_set():
+                        p.kill()
+                        p.wait()
+                        return None
+                    if time.time() - t_start > timeout_s:
+                        p.kill()
+                        p.wait()
+                        return dict(index=i, values=values, ok=False, error=f"timed out after {timeout_s:.0f} s")
+                    time.sleep(0.1)
+            if os.path.exists(jout):
+                with open(jout, encoding="utf-8") as fh:
+                    return json.load(fh)
+            with open(err_path, encoding="utf-8", errors="replace") as fh:
+                lines = fh.read().strip().splitlines()
+            return dict(index=i, values=values, ok=False,
+                        error=(lines or [f"worker died (exit code {p.returncode})"])[-1])
+        finally:
+            for f in (jin, jout, err_path):
+                try:
+                    os.remove(f)
+                except OSError:
+                    pass
 
     rows = list(done.values())
     n_all = spec.n_cases()
@@ -340,6 +403,8 @@ def run_batch(spec: BatchSpec, workers=None, progress=None, folder=None, timeout
         futs = [ex.submit(one, i, v) for i, v in todo]
         for k, f in enumerate(as_completed(futs)):
             r = f.result()
+            if r is None:                         # stopped before / while running
+                continue
             rows.append(r)
             fh.write(json.dumps(r) + "\n")
             fh.flush()
@@ -349,6 +414,10 @@ def run_batch(spec: BatchSpec, workers=None, progress=None, folder=None, timeout
                 eta = el / (k + 1) * (len(todo) - k - 1)
                 progress(n_done / max(n_all, 1), f"{n_done}/{n_all} cases, {el/60:.1f} min elapsed, "
                                                   f"~{eta/60:.1f} min left")
+    try:
+        os.rmdir(jobs_dir)
+    except OSError:
+        pass
     rows.sort(key=lambda r: r["index"])
     return rows
 
@@ -397,7 +466,7 @@ def table(rows, spec: BatchSpec):
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if argv and argv[0] == "--worker":
-        _worker_main()
+        _worker_main(argv[1:])
         return
     if not argv:
         print(__doc__)

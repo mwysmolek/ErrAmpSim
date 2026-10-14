@@ -1,0 +1,139 @@
+name: Build Windows portable app
+
+on:
+  push:
+    branches: [main, master, "claude/**"]
+    tags: ["v*"]
+    paths:
+      - amp_qt/**
+      - fibamp/**
+      - assets/**
+      - packaging/**
+      - tests/**
+      - requirements*.txt
+      - CHANGELOG.md
+      - .github/workflows/build-windows.yml
+  pull_request:
+    paths:
+      - amp_qt/**
+      - fibamp/**
+      - packaging/**
+      - tests/**
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Publish a GitHub release v<version> (tag created at this commit if missing)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write   # only used to attach the portable zip to a release
+
+jobs:
+  windows-portable:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: python -m pip install -r requirements.txt -r packaging/requirements-build.txt
+
+      - name: Version
+        id: ver
+        shell: pwsh
+        run: |
+          $v = python -c "import sys; sys.path.insert(0, 'packaging'); import build_exe; print(build_exe.version())"
+          "version=$v" >> $env:GITHUB_OUTPUT
+          if ($env:GITHUB_REF -like 'refs/tags/v*' -and $env:GITHUB_REF_NAME -ne "v$v") {
+            throw "tag $env:GITHUB_REF_NAME does not match amp_qt.__version__ $v"
+          }
+          $tagged = git ls-remote --tags origin "refs/tags/v$v"
+          "untagged=$([string]::IsNullOrWhiteSpace($tagged))".ToLower() >> $env:GITHUB_OUTPUT
+
+      - name: Tests (engine, batch workers, portability, desktop app)
+        shell: pwsh
+        run: |
+          $env:AMPSTUDIO_HOME = "$env:RUNNER_TEMP\ampstudio-tests"
+          $env:QT_QPA_PLATFORM = "offscreen"
+          python -m pytest -q tests
+
+      - name: Build the portable app
+        run: python packaging/build_exe.py --no-zip
+
+      - name: Smoke test (the packaged app opens, simulates, exits) and portability check
+        shell: pwsh
+        run: |
+          $app = "dist\kayEi-AmpStudio"
+          $exe = "$app\kayei_ampstudio.exe"
+          $before = Test-Path "$env:LOCALAPPDATA\kayEi AmpStudio"
+          $p = Start-Process -FilePath $exe -ArgumentList "--smoke" -PassThru
+          $finished = $p.WaitForExit(240000)
+          if (-not $finished) { $p.Kill() }
+          "---- log ----"; Get-Content "$app\data\ampstudio.log" -Tail 40 -ErrorAction SilentlyContinue; "---- end ----"
+          if (-not $finished) { throw "smoke test timed out" }
+          if ($p.ExitCode -ne 0) { throw "smoke test failed with exit code $($p.ExitCode)" }
+          if (-not (Select-String -Path "$app\data\ampstudio.log" -Pattern "SMOKE-QT OK" -Quiet)) { throw "no SMOKE-QT OK in the log" }
+          # portable: the data folder sits next to the exe, nothing in AppData or the registry
+          if (-not (Test-Path "$app\data")) { throw "no data folder next to the exe" }
+          if (-not $before -and (Test-Path "$env:LOCALAPPDATA\kayEi AmpStudio")) { throw "wrote to LOCALAPPDATA" }
+          foreach ($k in "HKCU:\Software\kayEi", "HKCU:\Software\kayEi AmpStudio") {
+            if (Test-Path $k) { throw "wrote to the registry: $k" }
+          }
+          "portable OK"
+
+      - name: Headless run and a batch in worker processes (packaged exe)
+        shell: pwsh
+        run: |
+          $app = "dist\kayEi-AmpStudio"
+          $exe = "$app\kayei_ampstudio.exe"
+          $w = "$env:RUNNER_TEMP\headless"
+          New-Item -ItemType Directory -Force $w | Out-Null
+          $r = Start-Process $exe -ArgumentList "new", "C-band", "`"$w\p.ampstudio`"" -PassThru -Wait
+          if ($r.ExitCode -ne 0) { throw "new failed: $($r.ExitCode)" }
+          $r = Start-Process $exe -ArgumentList "run", "`"$w\p.ampstudio`"", "--accuracy", "draft", "--json", "`"$w\out.json`"", "--stage", "`"$w\out.fibamp.npz`"" -PassThru -Wait
+          if ($r.ExitCode -ne 0) { throw "headless run failed: $($r.ExitCode)" }
+          $rep = Get-Content "$w\out.json" -Raw | ConvertFrom-Json
+          if ($rep.summary.'output pulse energy (uJ)' -le 0) { throw "no output energy" }
+          $r = Start-Process $exe -ArgumentList "batch", "`"$w\p.ampstudio`"", "--accuracy", "draft", "--axis", "length_m=1.5,2.5" -PassThru
+          if (-not $r.WaitForExit(600000)) { $r.Kill(); throw "batch timed out" }
+          Get-Content "$app\data\ampstudio.log" -Tail 15
+          if ($r.ExitCode -ne 0) { throw "batch failed: $($r.ExitCode)" }
+          if (-not (Get-ChildItem "$app\data\batches" -Recurse -Filter report.html)) { throw "no batch report" }
+          "headless + batch OK"
+
+      - name: Portable zip, checksum and size
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force "dist\kayEi-AmpStudio\data"          # never ship the test data
+          python packaging/build_exe.py --zip-only
+          $zip = Get-ChildItem dist -Filter "*-portable.zip" | Select-Object -First 1
+          "{0}  {1}" -f (Get-FileHash $zip.FullName -Algorithm SHA256).Hash.ToLower(), $zip.Name | Set-Content "dist\SHA256SUMS.txt"
+          Get-Content "dist\SHA256SUMS.txt"
+          '{0}: {1:N1} MB' -f $zip.Name, ($zip.Length / 1MB)
+
+      - uses: actions/upload-artifact@v4
+        if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')
+        with:
+          name: kayEi-AmpStudio-${{ steps.ver.outputs.version }}-win64-portable
+          path: |
+            dist/kayEi-AmpStudio-*-portable.zip
+            dist/SHA256SUMS.txt
+          retention-days: 7
+
+      - name: Publish release (version tag, a new version on main, or a manual run with 'release' ticked)
+        if: startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && steps.ver.outputs.untagged == 'true') || (github.event_name == 'workflow_dispatch' && inputs.release)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: kayEi AmpStudio ${{ steps.ver.outputs.version }} (Windows, portable)
+          generate_release_notes: true
+          files: |
+            dist/kayEi-AmpStudio-*-portable.zip
+            dist/SHA256SUMS.txt

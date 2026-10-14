@@ -15,9 +15,16 @@ import numpy as np
 
 from .config import PumpConfig, SeedConfig, SimConfig
 from .fiber import FiberDatasheet
+from .paths import sub
 
-FIBRE_DIR = os.path.join(os.path.expanduser("~"), "fibamp", "fibres")
-RUN_DIR = os.path.join(os.path.expanduser("~"), "fibamp", "runs")
+
+def fibre_dir() -> str:
+    """The fibre library folder (inside the portable data folder, see :mod:`fibamp.paths`)."""
+    return str(sub("fibres"))
+
+
+def run_dir() -> str:
+    return str(sub("runs"))
 
 
 def _json_default(o):
@@ -73,13 +80,15 @@ def parse_run_config(text: str):
 
 
 # ---------------------------------------------------------------- fibre library
-def list_fibres(folder=FIBRE_DIR):
+def list_fibres(folder=None):
+    folder = folder or fibre_dir()
     if not os.path.isdir(folder):
         return []
     return sorted(f[:-5] for f in os.listdir(folder) if f.endswith(".json"))
 
 
-def save_fibre(ds: FiberDatasheet, folder=FIBRE_DIR) -> str:
+def save_fibre(ds: FiberDatasheet, folder=None) -> str:
+    folder = folder or fibre_dir()
     os.makedirs(folder, exist_ok=True)
     safe = "".join(c if c.isalnum() or c in "-_. " else "_" for c in ds.name).strip() or "fibre"
     path = os.path.join(folder, safe + ".json")
@@ -88,9 +97,17 @@ def save_fibre(ds: FiberDatasheet, folder=FIBRE_DIR) -> str:
     return path
 
 
-def load_fibre(name, folder=FIBRE_DIR) -> FiberDatasheet:
+def load_fibre(name, folder=None) -> FiberDatasheet:
+    folder = folder or fibre_dir()
     with open(os.path.join(folder, name + ".json"), encoding="utf-8") as fh:
         return FiberDatasheet.from_dict(json.load(fh))
+
+
+def delete_fibre(name, folder=None) -> None:
+    folder = folder or fibre_dir()
+    path = os.path.join(folder, name + ".json")
+    if os.path.exists(path):
+        os.remove(path)
 
 
 # ---------------------------------------------------------------- tables

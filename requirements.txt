@@ -1,0 +1,6 @@
+# kayEi AmpStudio: fibamp engine + desktop app (python -m amp_qt.app)
+numpy>=1.26
+scipy>=1.11
+plotly>=5.20
+PySide6>=6.7
+pytest>=8.0
