@@ -1,0 +1,1016 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Frantz–Nodvik Pulse Amplifier</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Interactive Frantz–Nodvik gain-saturation calculator: see how a pulse is reshaped by a laser amplifier, or work backwards to the seed shape that produces a wanted output.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a control rail on the left, live results on the right; theory and references as a reading column below. */
+:root {
+  --bg: #f3f4f7;
+  --surface: #ffffff;
+  --surface-2: #e9ebf0;
+  --fg: #161a21;
+  --fg-2: #4a5160;
+  --muted: #7c8595;
+  --line: #d9dde5;
+  --grid: #e7e9ee;
+  --axis: #c4c9d3;
+  --accent: #4f44c4;
+  --accent-fg: #ffffff;
+  --c-in: #2a78d6;
+  --c-out: #eb6834;
+  --c-gain: #1baf7a;
+  --ramp-0: #9ec5f4;
+  --ramp-1: #0d366b;
+  --warn: #fab219;
+  --crit: #d03b3b;
+  --good: #0ca30c;
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121316; --surface: #1b1d22; --surface-2: #24272e; --fg: #eceef2; --fg-2: #b7bcc7; --muted: #8b93a3;
+    --line: #2e323b; --grid: #292c34; --axis: #3d424d; --accent: #9d93ee; --accent-fg: #121316;
+    --c-in: #3987e5; --c-out: #d95926; --c-gain: #199e70; --ramp-0: #1c5cab; --ramp-1: #b7d3f6;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121316; --surface: #1b1d22; --surface-2: #24272e; --fg: #eceef2; --fg-2: #b7bcc7; --muted: #8b93a3;
+  --line: #2e323b; --grid: #292c34; --axis: #3d424d; --accent: #9d93ee; --accent-fg: #121316;
+  --c-in: #3987e5; --c-out: #d95926; --c-gain: #199e70; --ramp-0: #1c5cab; --ramp-1: #b7d3f6;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--font-ui); -webkit-text-size-adjust: 100%; }
+.page { max-width: 1440px; margin: 0 auto; padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 56px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; line-height: 1.2; }
+h1 { font-size: 1.55rem; font-weight: 600; letter-spacing: -0.01em; }
+h2 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-2); }
+h3 { font-size: 1rem; font-weight: 600; }
+p { margin: 0; }
+a { color: var(--accent); }
+code, .mono { font-family: var(--font-mono); font-size: 0.92em; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; margin-bottom: 18px; }
+.tagline { color: var(--fg-2); max-width: 60ch; margin-top: 4px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; margin: 0; background: var(--surface); }
+.seg label { position: relative; cursor: pointer; }
+.seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg span { display: inline-block; padding: 6px 14px; border-radius: 999px; font-weight: 500; font-size: 0.92rem; color: var(--fg-2); }
+.seg input:checked + span { background: var(--accent); color: var(--accent-fg); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.workspace { display: grid; grid-template-columns: 350px minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 960px) { .workspace { grid-template-columns: 1fr; } }
+.rail { display: grid; gap: 14px; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px 16px; display: grid; gap: 10px; }
+.panel h2 { padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.field { display: grid; grid-template-columns: minmax(0, 1fr) 104px; gap: 8px; align-items: center; }
+.field.with-unit { grid-template-columns: minmax(0, 1fr) 104px 66px; }
+.field > label { font-size: 0.92rem; color: var(--fg-2); min-width: 0; }
+.field .hint { display: block; font-size: 0.78rem; color: var(--muted); }
+input[type="number"], input[type="text"], select, textarea {
+  font: inherit; font-family: var(--font-mono); font-size: 0.9rem; color: var(--fg); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; width: 100%; min-width: 0;
+}
+input[type="number"] { font-variant-numeric: tabular-nums; }
+select { font-family: var(--font-ui); }
+textarea { resize: vertical; min-height: 96px; line-height: 1.35; }
+input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.check { display: inline-flex; align-items: center; gap: 6px; font-size: 0.92rem; color: var(--fg-2); cursor: pointer; }
+.check input { accent-color: var(--accent); margin: 0; }
+.derived { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; font-size: 0.86rem; color: var(--fg-2); background: var(--surface-2); border-radius: 4px; padding: 8px 10px; }
+.derived b { font-family: var(--font-mono); font-weight: 500; color: var(--fg); font-variant-numeric: tabular-nums; text-align: right; }
+.btn { font: inherit; font-size: 0.88rem; font-weight: 500; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 5px 12px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.err { color: var(--crit); font-size: 0.85rem; }
+
+.results { display: grid; gap: 14px; min-width: 0; }
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 560px) { .kpis { grid-template-columns: 1fr; } }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; min-width: 0; }
+.kpi .k { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.kpi .v { font-size: 1.7rem; font-weight: 600; line-height: 1.15; margin-top: 2px; }
+.kpi .v small { font-size: 0.95rem; font-weight: 500; color: var(--fg-2); margin-left: 3px; }
+.kpi .s { font-size: 0.85rem; color: var(--fg-2); margin-top: 2px; }
+.warnings { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.warnings:empty { display: none; }
+.warnings li { display: flex; gap: 10px; align-items: flex-start; font-size: 0.9rem; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--warn); border-radius: 4px; padding: 7px 12px; color: var(--fg-2); }
+.warnings li.info { border-left-color: var(--accent); }
+.warnings li.crit { border-left-color: var(--crit); }
+.warnings li .ico { font-weight: 600; flex: none; color: var(--fg); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px 10px; min-width: 0; }
+.card header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 14px; margin-bottom: 6px; }
+.card header p { font-size: 0.85rem; color: var(--muted); }
+canvas.chart { display: block; width: 100%; height: 290px; touch-action: pan-y; }
+canvas.chart.small { height: 190px; }
+canvas.chart.tall { height: 340px; }
+@media (max-width: 560px) { canvas.chart { height: 240px; } canvas.chart.tall { height: 280px; } }
+.multiples { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 760px) { .multiples { grid-template-columns: 1fr; } }
+.multiples h4 { margin: 0 0 2px; font-size: 0.85rem; font-weight: 500; color: var(--fg-2); }
+table.cmp { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+table.cmp th, table.cmp td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+table.cmp th { font-weight: 500; color: var(--fg-2); }
+table.cmp th:first-child, table.cmp td:first-child { text-align: left; }
+table.cmp tbody tr:last-child td { border-bottom: 0; }
+table.cmp td.num { font-family: var(--font-mono); font-size: 0.88rem; }
+.chip { display: inline-block; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--fg-2); margin-left: 6px; vertical-align: middle; }
+.chip.spec { background: var(--accent); color: var(--accent-fg); }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+details.data { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; }
+details.data summary { cursor: pointer; font-weight: 500; }
+details.data .tablewrap { overflow-x: auto; margin-top: 8px; }
+details.data table { min-width: 480px; }
+
+.prose { max-width: 76ch; margin: 44px auto 0; display: grid; gap: 12px; }
+.prose h2 { font-size: 1.25rem; text-transform: none; letter-spacing: -0.01em; color: var(--fg); border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.prose h3 { font-size: 1.02rem; margin-top: 10px; }
+.prose p, .prose li { color: var(--fg-2); }
+.prose ul, .prose ol { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; }
+.prose math { font-size: 1.08em; color: var(--fg); }
+.prose math[display="block"] { margin: 6px 0; overflow-x: auto; max-width: 100%; }
+.prose .eq { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; overflow-x: auto; }
+.prose table.vars { border-collapse: collapse; font-size: 0.92rem; width: 100%; }
+.prose table.vars td { padding: 4px 8px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--fg-2); }
+.prose table.vars td:first-child { white-space: nowrap; color: var(--fg); }
+.refs ol li { padding-left: 4px; }
+.refs .id { font-family: var(--font-mono); font-size: 0.85em; color: var(--muted); margin-right: 4px; }
+footer.foot { max-width: 76ch; margin: 36px auto 0; font-size: 0.85rem; color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) { .btn, .seg span { transition: background-color 120ms, border-color 120ms; } }
+</style>
+</head>
+<body>
+<div class="page">
+<header class="top">
+  <div>
+    <h1>Frantz–Nodvik Pulse Amplifier</h1>
+    <p class="tagline">Gain saturation reshapes a pulse as it extracts stored energy. Run it forwards to see the output, or backwards to find the seed shape that produces a wanted output.</p>
+  </div>
+  <fieldset class="seg" id="modeSeg">
+    <legend class="sr-only">Calculation direction</legend>
+    <label><input type="radio" name="mode" value="fwd" id="mode-fwd" checked><span>Input → output</span></label>
+    <label><input type="radio" name="mode" value="inv" id="mode-inv"><span>Output → required input</span></label>
+  </fieldset>
+</header>
+
+<div class="workspace">
+<aside class="rail">
+  <section class="panel" aria-labelledby="h-amp">
+    <h2 id="h-amp">Amplifier</h2>
+    <div class="field">
+      <label for="preset">Gain medium preset</label>
+      <select id="preset" style="grid-column: 1 / -1"></select>
+    </div>
+    <div class="field">
+      <label for="lam">Wavelength <span class="hint">nm</span></label>
+      <input type="number" id="lam" min="200" step="1">
+    </div>
+    <div class="field">
+      <label for="sa">σ<sub>a</sub> absorption <span class="hint">×10⁻²⁵ m² (= 10⁻²¹ cm²)</span></label>
+      <input type="number" id="sa" min="0" step="0.1">
+    </div>
+    <div class="field">
+      <label for="se">σ<sub>e</sub> emission <span class="hint">×10⁻²⁵ m²</span></label>
+      <input type="number" id="se" min="0" step="0.1">
+    </div>
+    <div class="field">
+      <label for="mfd">Mode-field / beam diameter <span class="hint">µm (1/e², A<sub>eff</sub> = π d²/4)</span></label>
+      <input type="number" id="mfd" min="0.1" step="0.5">
+    </div>
+    <div class="row">
+      <label class="check"><input type="checkbox" id="esatDirectOn"> Set E<sub>sat</sub> directly</label>
+    </div>
+    <div class="field with-unit" id="esatDirectRow">
+      <label for="esatDirect">Saturation energy E<sub>sat</sub></label>
+      <input type="number" id="esatDirect" min="0" step="any">
+      <select id="esatUnit"><option value="nJ">nJ</option><option value="uJ">µJ</option><option value="mJ">mJ</option></select>
+    </div>
+    <div class="field">
+      <label for="gainDb">Small-signal gain G<sub>0</sub> <span class="hint">dB, single pass</span></label>
+      <input type="number" id="gainDb" step="0.5">
+      <input type="range" id="gainRange" min="-10" max="60" step="0.5" style="grid-column: 1 / -1" aria-label="Small-signal gain slider">
+    </div>
+    <div class="derived" id="ampDerived"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-pulse">
+    <h2 id="h-pulse">Input pulse</h2>
+    <div class="field">
+      <label for="shape">Shape</label>
+      <select id="shape">
+        <option value="gauss">Gaussian</option>
+        <option value="supergauss">Super-Gaussian</option>
+        <option value="sech2">sech²</option>
+        <option value="square">Square (logistic edges)</option>
+        <option value="qswitch">Q-switch (asymmetric)</option>
+        <option value="custom">Custom (table)</option>
+      </select>
+    </div>
+    <div class="field with-unit">
+      <label for="fwhm">Pulse width <span class="hint">FWHM</span></label>
+      <input type="number" id="fwhm" min="0" step="any">
+      <select id="tUnit"><option value="ps">ps</option><option value="ns">ns</option><option value="us">µs</option></select>
+    </div>
+    <div class="field" id="row-sgOrder">
+      <label for="sgOrder">Super-Gaussian order m <span class="hint">exp[−ln2 (2|t|/T)<sup>2m</sup>]</span></label>
+      <input type="number" id="sgOrder" min="1" max="40" step="0.5">
+    </div>
+    <div class="field" id="row-edgePct">
+      <label for="edgePct">Edge time, 10–90 % <span class="hint">% of FWHM</span></label>
+      <input type="number" id="edgePct" min="0.2" max="50" step="0.5">
+    </div>
+    <div class="field" id="row-fallRise">
+      <label for="fallRise">Fall / rise time ratio <span class="hint">1/[e<sup>−t/τr</sup> + e<sup>t/τf</sup>]²</span></label>
+      <input type="number" id="fallRise" min="0.05" max="50" step="0.5">
+    </div>
+    <div id="row-custom" style="display: grid; gap: 6px;">
+      <label for="customText" style="font-size: 0.92rem; color: var(--fg-2);">Samples: one <code>t, P</code> pair per line (or P only, uniform spacing). Any units; negative P is clipped.</label>
+      <textarea id="customText" spellcheck="false"></textarea>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="customScale"> Rescale time axis to the FWHM above</label>
+        <label class="btn" for="customFile" style="margin-left: auto;">Load file…</label>
+        <input type="file" id="customFile" accept=".csv,.txt,.dat,text/plain" class="sr-only">
+      </div>
+      <p class="err" id="customErr"></p>
+    </div>
+    <div class="row" role="radiogroup" aria-label="Specify pulse by">
+      <label class="check"><input type="radio" name="specify" value="energy" id="specify-energy"> Energy</label>
+      <label class="check"><input type="radio" name="specify" value="peak" id="specify-peak"> Peak power</label>
+    </div>
+    <div class="field with-unit" id="row-energy">
+      <label for="energy">Pulse energy</label>
+      <input type="number" id="energy" min="0" step="any">
+      <select id="eUnit"><option value="nJ">nJ</option><option value="uJ">µJ</option><option value="mJ">mJ</option></select>
+    </div>
+    <div class="field with-unit" id="row-peak">
+      <label for="peak">Peak power</label>
+      <input type="number" id="peak" min="0" step="any">
+      <select id="pUnit"><option value="W">W</option><option value="kW">kW</option><option value="MW">MW</option></select>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-disp">
+    <h2 id="h-disp">Display</h2>
+    <div class="row">
+      <label class="check"><input type="checkbox" id="normalize"> Normalise pulses to their peak</label>
+      <label class="check"><input type="checkbox" id="logy"> Log power axis</label>
+      <label class="check"><input type="checkbox" id="evoNorm"> Normalise each z-slice</label>
+    </div>
+    <div class="field">
+      <label for="slices">Slices along the amplifier</label>
+      <input type="number" id="slices" min="2" max="41" step="1">
+    </div>
+    <div class="row">
+      <button class="btn" type="button" id="copyCsv">Copy traces as CSV</button>
+      <button class="btn" type="button" id="reset">Reset to defaults</button>
+      <span id="copyMsg" style="font-size: 0.85rem; color: var(--fg-2);" aria-live="polite"></span>
+    </div>
+  </section>
+</aside>
+
+<main class="results">
+  <div class="kpis" aria-live="polite">
+    <div class="kpi"><div class="k">Net gain</div><div class="v" id="kpiGain">—</div><div class="s" id="kpiGainS"></div></div>
+    <div class="kpi"><div class="k">Extraction efficiency</div><div class="v" id="kpiEta">—</div><div class="s" id="kpiEtaS"></div></div>
+    <div class="kpi"><div class="k" id="kpiEk">Output energy</div><div class="v" id="kpiE">—</div><div class="s" id="kpiES"></div></div>
+  </div>
+  <ul class="warnings" id="warnings"></ul>
+
+  <section class="card">
+    <header><h3>Pulse shapes</h3><p>Hover or touch for a readout. Blue is the input, orange the output.</p></header>
+    <canvas class="chart tall" id="cvPulse" role="img" aria-label="Input and output pulse power versus time"></canvas>
+  </section>
+
+  <section class="card">
+    <header><h3>Instantaneous gain G(t)</h3><p>Gain seen by each part of the pulse. It falls as the leading edge burns the inversion.</p></header>
+    <canvas class="chart" id="cvGain" role="img" aria-label="Instantaneous gain in decibels versus time"></canvas>
+  </section>
+
+  <section class="card">
+    <header><h3>Shape along the amplifier</h3><p>Pulse after a fraction z/L of the gain, assuming uniform small-signal gain per unit length.</p></header>
+    <canvas class="chart" id="cvEvo" role="img" aria-label="Pulse shape at successive positions along the amplifier"></canvas>
+  </section>
+
+  <section class="card">
+    <header><h3 id="sweepTitle">Energy sweep</h3><p id="sweepSub">Same shape and gain, input energy swept. The dot marks the current setting.</p></header>
+    <div class="multiples">
+      <div><h4>Net gain (dB)</h4><canvas class="chart small" id="cvSw1" role="img" aria-label="Net gain versus energy"></canvas></div>
+      <div><h4 id="swRatioTitle">FWHM ratio, out / in</h4><canvas class="chart small" id="cvSw2" role="img" aria-label="Pulse width ratio versus energy"></canvas></div>
+      <div><h4>Extraction efficiency (%)</h4><canvas class="chart small" id="cvSw3" role="img" aria-label="Extraction efficiency versus energy"></canvas></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <header><h3>Input vs output</h3></header>
+    <div style="overflow-x: auto;">
+    <table class="cmp" id="cmpTable">
+      <thead><tr><th>Quantity</th><th><span class="swatch" style="background: var(--c-in)"></span>Input<span class="chip" id="chipIn"></span></th><th><span class="swatch" style="background: var(--c-out)"></span>Output<span class="chip" id="chipOut"></span></th><th>Change</th></tr></thead>
+      <tbody id="cmpBody"></tbody>
+    </table>
+    </div>
+  </section>
+
+  <details class="data">
+    <summary>Data table (sampled traces)</summary>
+    <div class="tablewrap"><table class="cmp" id="dataTable"><thead><tr><th id="dtT">t</th><th>P<sub>in</sub> (W)</th><th>P<sub>out</sub> (W)</th><th>G(t) (dB)</th><th>Extracted (%)</th></tr></thead><tbody id="dataBody"></tbody></table></div>
+  </details>
+</main>
+</div>
+
+<section class="prose" id="theory" aria-labelledby="h-theory">
+  <h2 id="h-theory">How it is implemented</h2>
+  <h3>Model</h3>
+  <p>The Frantz–Nodvik model describes a pulse crossing a gain medium whose inversion is only changed by the pulse itself: no pumping, no spontaneous decay and no amplified spontaneous emission during the pulse, homogeneous gain, a plane wave with no dispersion or nonlinearity. In a frame moving with the pulse the rate equations reduce to</p>
+  <div class="eq"><math display="block"><mrow>
+    <mfrac><mrow><mo>∂</mo><mi>I</mi></mrow><mrow><mo>∂</mo><mi>z</mi></mrow></mfrac><mo>=</mo><mi>g</mi><mo>⁢</mo><mi>I</mi><mo>,</mo>
+    <mspace width="1.6em"></mspace>
+    <mfrac><mrow><mo>∂</mo><mi>g</mi></mrow><mrow><mo>∂</mo><mi>t</mi></mrow></mfrac><mo>=</mo><mo>−</mo><mfrac><mrow><mi>g</mi><mo>⁢</mo><mi>I</mi></mrow><msub><mi>J</mi><mtext>sat</mtext></msub></mfrac><mo>,</mo>
+    <mspace width="1.6em"></mspace>
+    <msub><mi>J</mi><mtext>sat</mtext></msub><mo>=</mo><mfrac><mrow><mi>h</mi><mi>ν</mi></mrow><mrow><msub><mi>σ</mi><mi>a</mi></msub><mo>+</mo><msub><mi>σ</mi><mi>e</mi></msub></mrow></mfrac>
+  </mrow></math></div>
+  <p>where <math><mi>g</mi><mo>=</mo><msub><mi>σ</mi><mi>e</mi></msub><msub><mi>N</mi><mn>2</mn></msub><mo>−</mo><msub><mi>σ</mi><mi>a</mi></msub><msub><mi>N</mi><mn>1</mn></msub></math> is the gain coefficient. Writing the gain with both cross sections makes the same equations hold for three-level and quasi-three-level media such as Er and Yb fibre: the gain then relaxes towards transparency rather than towards zero inversion, and the saturation fluence carries <math><msub><mi>σ</mi><mi>a</mi></msub><mo>+</mo><msub><mi>σ</mi><mi>e</mi></msub></math> instead of <math><msub><mi>σ</mi><mi>e</mi></msub></math> alone. For a four-level medium set <math><msub><mi>σ</mi><mi>a</mi></msub><mo>=</mo><mn>0</mn></math>.</p>
+  <h3>Closed-form solution</h3>
+  <p>Integrating the second equation gives <math><mi>g</mi><mo>(</mo><mi>z</mi><mo>,</mo><mi>t</mi><mo>)</mo><mo>=</mo><msub><mi>g</mi><mn>0</mn></msub><mo>(</mo><mi>z</mi><mo>)</mo><mo>⁢</mo><mi>exp</mi><mo>[</mo><mo>−</mo><mi>J</mi><mo>(</mo><mi>z</mi><mo>,</mo><mi>t</mi><mo>)</mo><mo>/</mo><msub><mi>J</mi><mtext>sat</mtext></msub><mo>]</mo></math>, with <math><mi>J</mi><mo>(</mo><mi>z</mi><mo>,</mo><mi>t</mi><mo>)</mo></math> the fluence that has passed the point z up to time t. Substituting into the first equation and using <math><mi>y</mi><mo>=</mo><mi>exp</mi><mo>(</mo><mi>J</mi><mo>/</mo><msub><mi>J</mi><mtext>sat</mtext></msub><mo>)</mo></math> turns it into <math><mi>d</mi><mi>y</mi><mo>/</mo><mi>d</mi><mi>z</mi><mo>=</mo><msub><mi>g</mi><mn>0</mn></msub><mo>(</mo><mi>z</mi><mo>)</mo><mo>(</mo><mi>y</mi><mo>−</mo><mn>1</mn><mo>)</mo></math>, which integrates to the Frantz–Nodvik result for the cumulative fluence:</p>
+  <div class="eq"><math display="block"><mrow>
+    <msub><mi>J</mi><mtext>out</mtext></msub><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><msub><mi>J</mi><mtext>sat</mtext></msub><mo>⁢</mo><mi>ln</mi><mrow><mo>{</mo><mn>1</mn><mo>+</mo><msub><mi>G</mi><mn>0</mn></msub><mrow><mo>[</mo><mi>exp</mi><mrow><mo>(</mo><mfrac><mrow><msub><mi>J</mi><mtext>in</mtext></msub><mo>(</mo><mi>t</mi><mo>)</mo></mrow><msub><mi>J</mi><mtext>sat</mtext></msub></mfrac><mo>)</mo></mrow><mo>−</mo><mn>1</mn><mo>]</mo></mrow><mo>}</mo></mrow><mo>,</mo>
+    <mspace width="1.6em"></mspace>
+    <msub><mi>G</mi><mn>0</mn></msub><mo>=</mo><mi>exp</mi><mrow><mo>(</mo><msubsup><mo>∫</mo><mn>0</mn><mi>L</mi></msubsup><msub><mi>g</mi><mn>0</mn></msub><mi>d</mi><mi>z</mi><mo>)</mo></mrow>
+  </mrow></math></div>
+  <p>Only the integrated small-signal gain enters, so the total output is exact even when the inversion varies along the fibre. Differentiating with respect to time gives the output power and the instantaneous gain seen by each slice of the pulse:</p>
+  <div class="eq"><math display="block"><mrow>
+    <msub><mi>I</mi><mtext>out</mtext></msub><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><msub><mi>I</mi><mtext>in</mtext></msub><mo>(</mo><mi>t</mi><mo>)</mo><mo>⁢</mo><mi>G</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>,</mo>
+    <mspace width="1.6em"></mspace>
+    <mi>G</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><mfrac><mrow><msub><mi>G</mi><mn>0</mn></msub><msup><mi>e</mi><mi>u</mi></msup></mrow><mrow><mn>1</mn><mo>+</mo><msub><mi>G</mi><mn>0</mn></msub><mo>(</mo><msup><mi>e</mi><mi>u</mi></msup><mo>−</mo><mn>1</mn><mo>)</mo></mrow></mfrac><mo>=</mo><mfrac><mn>1</mn><mrow><mn>1</mn><mo>−</mo><msup><mi>e</mi><mrow><mo>−</mo><mi>u</mi></mrow></msup><mo>(</mo><mn>1</mn><mo>−</mo><mn>1</mn><mo>/</mo><msub><mi>G</mi><mn>0</mn></msub><mo>)</mo></mrow></mfrac><mo>,</mo>
+    <mspace width="1.6em"></mspace>
+    <mi>u</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><msub><mi>J</mi><mtext>in</mtext></msub><mo>(</mo><mi>t</mi><mo>)</mo><mo>/</mo><msub><mi>J</mi><mtext>sat</mtext></msub>
+  </mrow></math></div>
+  <p>The gain starts at <math><msub><mi>G</mi><mn>0</mn></msub></math> for the leading edge and falls towards 1 as the pulse extracts the inversion, which is why the front of the pulse is amplified more than the back: the output steepens, its peak moves forward and, for a Gaussian, it narrows.</p>
+  <h3>Backwards: the input that produces a wanted output</h3>
+  <p>The fluence relation is monotonic, so it inverts in closed form. Given the wanted output you get the required input directly, with no iteration:</p>
+  <div class="eq"><math display="block"><mrow>
+    <msub><mi>J</mi><mtext>in</mtext></msub><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><msub><mi>J</mi><mtext>sat</mtext></msub><mo>⁢</mo><mi>ln</mi><mrow><mo>{</mo><mn>1</mn><mo>+</mo><mfrac><mrow><mi>exp</mi><mo>(</mo><msub><mi>J</mi><mtext>out</mtext></msub><mo>(</mo><mi>t</mi><mo>)</mo><mo>/</mo><msub><mi>J</mi><mtext>sat</mtext></msub><mo>)</mo><mo>−</mo><mn>1</mn></mrow><msub><mi>G</mi><mn>0</mn></msub></mfrac><mo>}</mo></mrow><mo>,</mo>
+    <mspace width="1.6em"></mspace>
+    <msub><mi>I</mi><mtext>in</mtext></msub><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><mfrac><mrow><msub><mi>I</mi><mtext>out</mtext></msub><mo>(</mo><mi>t</mi><mo>)</mo></mrow><mrow><mn>1</mn><mo>+</mo><mo>(</mo><msub><mi>G</mi><mn>0</mn></msub><mo>−</mo><mn>1</mn><mo>)</mo><msup><mi>e</mi><mrow><mo>−</mo><mi>v</mi></mrow></msup></mrow></mfrac><mo>,</mo>
+    <mspace width="1.6em"></mspace>
+    <mi>v</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><msub><mi>J</mi><mtext>out</mtext></msub><mo>(</mo><mi>t</mi><mo>)</mo><mo>/</mo><msub><mi>J</mi><mtext>sat</mtext></msub>
+  </mrow></math></div>
+  <p>This is the pre-compensation used in shaped-seed fibre MOPAs [5, 6]: a square output needs a seed that ramps up towards its trailing edge to make up for the gain the front of the pulse has already consumed. The required input always exists; whether it is practical is another matter, and the warnings flag outputs that exceed the stored energy.</p>
+  <h3>Energies, not fluences</h3>
+  <p>For a single transverse mode the fluence is replaced by energy through the effective area, <math><msub><mi>E</mi><mtext>sat</mtext></msub><mo>=</mo><msub><mi>J</mi><mtext>sat</mtext></msub><msub><mi>A</mi><mtext>eff</mtext></msub></math> with <math><msub><mi>A</mi><mtext>eff</mtext></msub><mo>=</mo><mi>π</mi><msup><mi>d</mi><mn>2</mn></msup><mo>/</mo><mn>4</mn></math> for a Gaussian mode of 1/e² diameter d. The extractable stored energy and the extraction efficiency follow from the small-signal gain:</p>
+  <div class="eq"><math display="block"><mrow>
+    <msub><mi>E</mi><mtext>stored</mtext></msub><mo>=</mo><msub><mi>E</mi><mtext>sat</mtext></msub><mo>⁢</mo><mi>ln</mi><msub><mi>G</mi><mn>0</mn></msub><mo>,</mo>
+    <mspace width="1.6em"></mspace>
+    <mi>η</mi><mo>=</mo><mfrac><mrow><msub><mi>E</mi><mtext>out</mtext></msub><mo>−</mo><msub><mi>E</mi><mtext>in</mtext></msub></mrow><msub><mi>E</mi><mtext>stored</mtext></msub></mfrac>
+  </mrow></math></div>
+  <p>Treating the mode as a top-hat of area <math><msub><mi>A</mi><mtext>eff</mtext></msub></math> is the usual single-number approximation. A real Gaussian mode saturates its centre first, which softens the distortion slightly compared with the curves shown here.</p>
+  <h3>Numerics</h3>
+  <ul>
+    <li>Each shape is defined with unit width and calibrated numerically once (FWHM, peak position and the support where it exceeds 10⁻⁶ of the peak), then scaled to the requested FWHM. The grid has 4096 samples over that support with 4 % padding, so the Q-switch tail and the custom table are resolved on the same footing as the analytic shapes. Shapes follow the definitions in the Python package: Gaussian exp[−4 ln2 (t/T)²], super-Gaussian exp[−ln2 (2|t|/T)<sup>2m</sup>], sech²(1.7627 t/T), a square with logistic edges whose 10–90 % time is set as a fraction of the FWHM, and the asymmetric Q-switch shape 1/[exp(−t/τ<sub>r</sub>) + exp(t/τ<sub>f</sub>)]² with the fall/rise ratio as the free parameter.</li>
+    <li>The cumulative energy is accumulated sample by sample and the closed form is evaluated at the midpoint of every sample. No differential equation is integrated, so the result has no step-size error beyond the sampling of the pulse itself. Total energies use the exact fluence relation.</li>
+    <li>The forms <code>log1p(G₀·expm1(u))</code> and <code>1/(1 − e<sup>−u</sup>(1 − 1/G₀))</code> keep full precision for weak saturation (u ≪ 1) and for gains of 60 dB; for u above 30 the asymptotic expansion u + ln G₀ + log1p[(1/G₀ − 1)e<sup>−u</sup>] is used so nothing overflows. The same equations hold for G₀ below unity, where the medium is a saturable absorber.</li>
+    <li>The z-slices evaluate the same closed form with G₀ replaced by G₀<sup>z/L</sup>, which assumes the small-signal gain per unit length is uniform. The energy sweep repeats the forward (or inverse) calculation for 90 energies spaced logarithmically from 10⁻³ to 30 E<sub>sat</sub>, extended to include the current operating point.</li>
+    <li>FWHM is measured by linear interpolation of the half-maximum crossings on each side of the global maximum; rise and fall are the 10–90 % crossings on either side of the peak.</li>
+  </ul>
+  <h3>What it does not include</h3>
+  <ul>
+    <li>Pumping and decay during the pulse. The model needs the pulse to be much shorter than the upper-state lifetime (about 10 ms for Er, 1 ms for Yb in silica, 230 µs for Nd:YAG, 3.2 µs for Ti:sapphire); the presets carry these lifetimes and a warning appears when the pulse is longer than a tenth of it.</li>
+    <li>Coherent effects, finite gain bandwidth and dispersion, which matter below a picosecond or so.</li>
+    <li>Fibre nonlinearities (self-phase modulation, Raman, Brillouin), amplified spontaneous emission, excited-state absorption, ion pairing and the radial inversion profile. The Python package in this repository (<code>pulse.fn_deplete</code> and <code>pulse.propagate_pulse</code>) generalises the Frantz–Nodvik pass to rings, modes and paired ions and adds those effects.</li>
+  </ul>
+</section>
+
+<section class="prose refs" id="refs" aria-labelledby="h-refs">
+  <h2 id="h-refs">References</h2>
+  <ol>
+    <li><span class="id">[1]</span>L. M. Frantz and J. S. Nodvik, “Theory of pulse propagation in a laser amplifier,” <i>J. Appl. Phys.</i> <b>34</b>(8), 2346–2349 (1963). The original derivation for a two-level, four-level-like medium; the fluence formula above is their Eq. (22) written with the saturation fluence.</li>
+    <li><span class="id">[2]</span>W. H. Lowdermilk and J. E. Murray, “The multipass amplifier: theory and numerical analysis,” <i>J. Appl. Phys.</i> <b>51</b>(5), 2436–2444 (1980). Extends the model to lower-level population and multiple passes; the σ<sub>a</sub> + σ<sub>e</sub> saturation fluence used here is the three-level form of that extension.</li>
+    <li><span class="id">[3]</span>A. E. Siegman, <i>Lasers</i> (University Science Books, 1986), Chapter 10, “Laser pulse amplification.” Textbook treatment, including pulse steepening and energy extraction limits.</li>
+    <li><span class="id">[4]</span>W. Koechner, <i>Solid-State Laser Engineering</i>, 6th ed. (Springer, 2006), Chapter 4, “Laser amplifier.” Saturation fluences and the energy-extraction curves for Nd:YAG and other crystals used in the presets.</li>
+    <li><span class="id">[5]</span>D. N. Schimpf, C. Ruchert, D. Nodop, J. Limpert, A. Tünnermann and F. Salin, “Compensation of pulse-distortion in saturated laser amplifiers,” <i>Opt. Express</i> <b>16</b>(22), 17637–17646 (2008), <a href="https://doi.org/10.1364/OE.16.017637" rel="noopener">doi:10.1364/OE.16.017637</a>. The analytic inverse used in the “output → required input” mode, verified on a fibre amplifier chain.</li>
+    <li><span class="id">[6]</span>K. T. Vu, A. Malinowski, D. J. Richardson, F. Ghiringhelli, L. M. B. Hickey and M. N. Zervas, “Adaptive pulse shape control in a diode-seeded nanosecond fiber MOPA system,” <i>Opt. Express</i> <b>14</b>(23), 10996–11001 (2006), <a href="https://doi.org/10.1364/OE.14.010996" rel="noopener">doi:10.1364/OE.14.010996</a>. Pre-shaped seeds giving square output pulses from a saturated Yb fibre MOPA; A. Malinowski et al., <i>Opt. Express</i> <b>17</b>(23), 20927 (2009) does the same with an electro-optic modulator.</li>
+    <li><span class="id">[7]</span>R. Paschotta, <i>RP Photonics Encyclopedia</i>, articles “Gain saturation” and “Saturation energy,” <a href="https://www.rp-photonics.com/gain_saturation.html" rel="noopener">rp-photonics.com/gain_saturation.html</a>. Accessible summary of saturation energy and the Frantz–Nodvik result.</li>
+  </ol>
+  <p>Cross sections in the presets are representative literature-class values (the Er and Yb ones are taken from the data tables shipped with this repository, which are not vendor data); replace them with measured spectra for quantitative design.</p>
+</section>
+<footer class="foot">Part of the ErrAmpSim repository. Single file, no external code; the Google Fonts request only changes the typeface.</footer>
+</div>
+
+<script id="fn-core">
+/* Frantz–Nodvik core: pure functions, no DOM. Units: SI throughout (s, J, W, m, m²). */
+const FN = (() => {
+  'use strict';
+  const H = 6.62607015e-34, C0 = 2.99792458e8;
+
+  /* --- closed-form primitives; u, v are fluences in units of the saturation fluence, G0 is linear --- */
+  function joutNorm(u, G0) {                     // J_out / J_sat given J_in / J_sat
+    if (u <= 0) return 0;
+    if (u > 30) return u + Math.log(G0) + Math.log1p((1 / G0 - 1) * Math.exp(-u));
+    return Math.log1p(G0 * Math.expm1(u));
+  }
+  function jinNorm(v, G0) {                      // J_in / J_sat given J_out / J_sat (inverse)
+    if (v <= 0) return 0;
+    if (v > 30) return v - Math.log(G0) + Math.log1p((G0 - 1) * Math.exp(-v));
+    return Math.log1p(Math.expm1(v) / G0);
+  }
+  const gainAt = (u, G0) => 1 / (1 - Math.exp(-u) * (1 - 1 / G0));        // instantaneous gain vs input fluence
+  const invGainAt = (v, G0) => 1 / (1 + (G0 - 1) * Math.exp(-v));          // P_in / P_out vs output fluence
+
+  /* forward: input power trace -> output power trace, instantaneous gain, energies */
+  function forward(Pin, dt, Esat, G0) {
+    const N = Pin.length, Pout = new Float64Array(N), G = new Float64Array(N);
+    let U = 0;
+    for (let k = 0; k < N; k++) {
+      const g = gainAt((U + 0.5 * Pin[k] * dt) / Esat, G0);
+      G[k] = g; Pout[k] = Pin[k] * g; U += Pin[k] * dt;
+    }
+    return { Pout, G, Ein: U, Eout: Esat * joutNorm(U / Esat, G0) };
+  }
+  /* inverse: wanted output power trace -> required input power trace */
+  function inverse(Pout, dt, Esat, G0) {
+    const N = Pout.length, Pin = new Float64Array(N), G = new Float64Array(N);
+    let V = 0;
+    for (let k = 0; k < N; k++) {
+      const r = invGainAt((V + 0.5 * Pout[k] * dt) / Esat, G0);
+      G[k] = 1 / r; Pin[k] = Pout[k] * r; V += Pout[k] * dt;
+    }
+    return { Pin, G, Eout: V, Ein: Esat * jinNorm(V / Esat, G0) };
+  }
+
+  /* --- pulse metrics --- */
+  function argmax(P) { let m = -Infinity, i = 0; for (let k = 0; k < P.length; k++) if (P[k] > m) { m = P[k]; i = k; } return i; }
+  function crossing(t, P, level, i, j) {         // half-max style crossing between sample i (inside) and j (outside)
+    if (j < 0 || j >= P.length || P[i] === P[j]) return t[i];
+    return t[j] + (level - P[j]) * (t[i] - t[j]) / (P[i] - P[j]);
+  }
+  function fwhm(t, P) {
+    const im = argmax(P), max = P[im];
+    if (!(max > 0)) return 0;
+    const half = 0.5 * max;
+    let i0 = 0; while (P[i0] < half) i0++;
+    let i1 = P.length - 1; while (P[i1] < half) i1--;
+    return crossing(t, P, half, i1, i1 + 1) - crossing(t, P, half, i0, i0 - 1);
+  }
+  function edgeTimes(t, P) {                     // 10-90 % rise before the peak, 90-10 % fall after it
+    const im = argmax(P), max = P[im];
+    if (!(max > 0)) return { rise: 0, fall: 0 };
+    const left = lev => { let i = im; while (i > 0 && P[i] >= lev) i--; return crossing(t, P, lev, i + 1, i); };
+    const right = lev => { let i = im; while (i < P.length - 1 && P[i] >= lev) i++; return crossing(t, P, lev, i - 1, i); };
+    return { rise: left(0.9 * max) - left(0.1 * max), fall: right(0.1 * max) - right(0.9 * max) };
+  }
+  function stats(t, P, dt) {
+    const im = argmax(P);
+    let E = 0, M = 0;
+    for (let k = 0; k < P.length; k++) { E += P[k]; M += P[k] * t[k]; }
+    const e = edgeTimes(t, P);
+    return { E: E * dt, Ppk: P[im], tpk: t[im], centroid: E > 0 ? M / E : 0, fwhm: fwhm(t, P), rise: e.rise, fall: e.fall };
+  }
+
+  /* --- pulse shapes: unit-width definitions, calibrated numerically --- */
+  const LN2 = Math.LN2;
+  function unitShape(kind, p) {
+    switch (kind) {
+      case 'gauss': return { f: t => Math.exp(-4 * LN2 * t * t), range: [-5, 5] };
+      case 'supergauss': { const m = Math.max(1, p.sgOrder || 3); return { f: t => Math.exp(-LN2 * Math.pow(2 * Math.abs(t), 2 * m)), range: [-5, 5] }; }
+      case 'sech2': return { f: t => { const c = Math.cosh(1.7627 * t); return 1 / (c * c); }, range: [-8, 8] };
+      case 'square': { const e = Math.max(0.002, Math.min(0.5, (p.edgePct || 5) / 100)) / 2.197; return { f: t => 1 / (1 + Math.exp((Math.abs(t) - 0.5) / e)), range: [-6, 6] }; }
+      case 'qswitch': { const r = Math.max(0.05, Math.min(50, p.fallRise || 3)); return { f: t => { const a = Math.exp(-t) + Math.exp(t / r); return 1 / (a * a); }, range: [-15, 15 + 8 * r] }; }
+      case 'custom': {
+        const td = p.custom.t, Pd = p.custom.P, n = td.length;
+        const f = t => {
+          if (t <= td[0] || t >= td[n - 1]) return 0;
+          let lo = 0, hi = n - 1;
+          while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (td[mid] <= t) lo = mid; else hi = mid; }
+          const w = (t - td[lo]) / (td[hi] - td[lo]);
+          return Pd[lo] + w * (Pd[hi] - Pd[lo]);
+        };
+        return { f, range: [td[0], td[n - 1]] };
+      }
+    }
+    throw new Error('unknown shape ' + kind);
+  }
+  function calibrate(kind, p) {                  // FWHM, peak position, support of the unit shape
+    const { f, range } = unitShape(kind, p);
+    const n = 40001, t = new Float64Array(n), s = new Float64Array(n), d = (range[1] - range[0]) / (n - 1);
+    for (let i = 0; i < n; i++) { t[i] = range[0] + i * d; s[i] = f(t[i]); }
+    const im = argmax(s), peak = s[im];
+    let a = 0; while (a < im && s[a] < 1e-6 * peak) a++;
+    let b = n - 1; while (b > im && s[b] < 1e-6 * peak) b--;
+    return { f, fwhm: fwhm(t, s), tPeak: t[im], peak, extent: [t[a], t[b]] };
+  }
+  /* sample a calibrated shape with FWHM T (seconds) on a grid of N points; returns unit-peak samples */
+  function buildPulse(cal, T, N = 4096) {
+    const k = T / cal.fwhm;                       // seconds per unit time
+    const ta = (cal.extent[0] - cal.tPeak) * k, tb = (cal.extent[1] - cal.tPeak) * k;
+    const pad = 0.04 * (tb - ta);
+    const t0 = ta - pad, dt = (tb + pad - t0) / (N - 1);
+    const t = new Float64Array(N), s = new Float64Array(N);
+    for (let i = 0; i < N; i++) { t[i] = t0 + i * dt; s[i] = cal.f(t[i] / k + cal.tPeak) / cal.peak; }
+    return { t, s, dt };
+  }
+  function parseCustom(text) {
+    const lines = text.split(/\r?\n/), rows = [];
+    let ncol = 0;
+    for (const line of lines) {
+      const nums = line.trim().split(/[,;\s]+/).map(Number).filter(Number.isFinite);
+      if (!nums.length) continue;
+      if (!ncol) ncol = nums.length;
+      rows.push(ncol >= 2 ? [nums[0], nums[1]] : [rows.length, nums[0]]);
+    }
+    if (rows.length < 3) return { error: 'Need at least three samples.' };
+    rows.sort((a, b) => a[0] - b[0]);
+    const t = [], P = [];
+    for (const [x, y] of rows) { if (t.length && x === t[t.length - 1]) continue; t.push(x); P.push(Math.max(0, y)); }
+    if (t.length < 3) return { error: 'Need at least three distinct time values.' };
+    if (!(Math.max(...P) > 0)) return { error: 'All samples are zero or negative.' };
+    return { t: Float64Array.from(t), P: Float64Array.from(P) };
+  }
+  function esatFrom(lam_m, sa_m2, se_m2, d_m) {
+    const Jsat = H * C0 / lam_m / (sa_m2 + se_m2), Aeff = Math.PI * d_m * d_m / 4;
+    return { Jsat, Aeff, Esat: Jsat * Aeff };
+  }
+  return { H, C0, joutNorm, jinNorm, gainAt, invGainAt, forward, inverse, fwhm, stats, argmax, calibrate, buildPulse, parseCustom, esatFrom };
+})();
+</script>
+
+<script>
+(function () {
+'use strict';
+const $ = id => document.getElementById(id);
+const TU = { ps: 1e-12, ns: 1e-9, us: 1e-6 }, TUL = { ps: 'ps', ns: 'ns', us: 'µs' };
+const EU = { nJ: 1e-9, uJ: 1e-6, mJ: 1e-3 }, EUL = { nJ: 'nJ', uJ: 'µJ', mJ: 'mJ' };
+const PU = { W: 1, kW: 1e3, MW: 1e6 };
+
+/* cross sections in 1e-25 m²; d in µm; tau is the upper-state lifetime in s */
+const PRESETS = [
+  { id: 'er-sm', name: 'Er fibre, 1550 nm, single-mode (MFD 8 µm)', lam: 1550, sa: 2.5, se: 3.2, mfd: 8, tau: 10e-3 },
+  { id: 'er-lma', name: 'Er fibre, 1550 nm, large-mode-area (MFD 20 µm)', lam: 1550, sa: 2.5, se: 3.2, mfd: 20, tau: 10e-3 },
+  { id: 'er-1535', name: 'Er fibre, 1535 nm gain peak (MFD 8 µm)', lam: 1535, sa: 7.0, se: 6.6, mfd: 8, tau: 10e-3 },
+  { id: 'yb-1030', name: 'Yb fibre, 1030 nm, single-mode (MFD 6.5 µm)', lam: 1030, sa: 0.12, se: 5.2, mfd: 6.5, tau: 0.85e-3 },
+  { id: 'yb-1064', name: 'Yb fibre, 1064 nm, large-mode-area (MFD 20 µm)', lam: 1064, sa: 0.017, se: 2.1, mfd: 20, tau: 0.85e-3 },
+  { id: 'ndyag', name: 'Nd:YAG rod, 1064 nm (beam 2 mm)', lam: 1064, sa: 0, se: 280, mfd: 2000, tau: 230e-6 },
+  { id: 'ybyag', name: 'Yb:YAG, 1030 nm (beam 1 mm)', lam: 1030, sa: 1.2, se: 21, mfd: 1000, tau: 0.95e-3 },
+  { id: 'tisa', name: 'Ti:sapphire, 800 nm (beam 3 mm)', lam: 800, sa: 0, se: 300, mfd: 3000, tau: 3.2e-6 },
+  { id: 'custom', name: 'Custom medium' },
+];
+const DEFAULTS = {
+  mode: 'fwd', preset: 'er-sm', lam: 1550, sa: 2.5, se: 3.2, mfd: 8, esatDirectOn: false, esatDirect: 10, esatUnit: 'uJ', gainDb: 30,
+  shape: 'gauss', fwhm: 10, tUnit: 'ns', sgOrder: 3, edgePct: 5, fallRise: 3,
+  customText: '0, 0\n1, 0.2\n2, 1\n3, 0.8\n4, 0.8\n5, 0.3\n6, 0.05\n7, 0', customScale: true,
+  specify: 'energy', energy: 0.1, eUnit: 'uJ', peak: 10, pUnit: 'W',
+  normalize: true, logy: false, evoNorm: true, slices: 11,
+};
+const STORE_KEY = 'frantz-nodvik-settings-v1';
+let S = { ...DEFAULTS };
+
+/* ---------- formatting ---------- */
+function sig(v, n = 3) {
+  if (!Number.isFinite(v)) return '—';
+  if (v === 0) return '0';
+  const a = Math.abs(v);
+  if (a >= 1e5 || a < 1e-3) return v.toExponential(n - 1).replace(/\.?0+e/, 'e').replace('e+', 'e');
+  let s = v.toPrecision(n);
+  if (s.includes('.')) s = s.replace(/\.?0+$/, '');
+  return s;
+}
+function fmtPow(W) {
+  if (!Number.isFinite(W)) return '—';
+  const a = Math.abs(W);
+  if (a >= 1e9) return sig(W / 1e9) + ' GW';
+  if (a >= 1e6) return sig(W / 1e6) + ' MW';
+  if (a >= 1e3) return sig(W / 1e3) + ' kW';
+  if (a >= 1 || a === 0) return sig(W) + ' W';
+  return sig(W * 1e3) + ' mW';
+}
+function fmtE(J) {
+  if (!Number.isFinite(J)) return '—';
+  const a = Math.abs(J);
+  if (a >= 1) return sig(J) + ' J';
+  if (a >= 1e-3) return sig(J * 1e3) + ' mJ';
+  if (a >= 1e-6) return sig(J * 1e6) + ' µJ';
+  if (a >= 1e-9) return sig(J * 1e9) + ' nJ';
+  return sig(J * 1e12) + ' pJ';
+}
+const fmtT = s => sig(s / TU[S.tUnit]) + ' ' + TUL[S.tUnit];
+const dB = x => 10 * Math.log10(x);
+
+/* ---------- state <-> form ---------- */
+const FIELDS = Object.keys(DEFAULTS);
+function readForm() {
+  const n = {};
+  for (const k of FIELDS) {
+    if (k === 'mode') n.mode = $('mode-inv').checked ? 'inv' : 'fwd';
+    else if (k === 'specify') n.specify = $('specify-peak').checked ? 'peak' : 'energy';
+    else {
+      const el = $(k);
+      if (el.type === 'checkbox') n[k] = el.checked;
+      else if (el.type === 'number') { const v = parseFloat(el.value); n[k] = Number.isFinite(v) ? v : DEFAULTS[k]; }
+      else n[k] = el.value;
+    }
+  }
+  S = n;
+}
+function writeForm() {
+  for (const k of FIELDS) {
+    if (k === 'mode') { $('mode-fwd').checked = S.mode !== 'inv'; $('mode-inv').checked = S.mode === 'inv'; }
+    else if (k === 'specify') { $('specify-energy').checked = S.specify !== 'peak'; $('specify-peak').checked = S.specify === 'peak'; }
+    else { const el = $(k); if (el.type === 'checkbox') el.checked = !!S[k]; else el.value = S[k]; }
+  }
+  $('gainRange').value = Math.max(-10, Math.min(60, S.gainDb));
+}
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { /* storage unavailable */ } }
+function load() {
+  try { const raw = localStorage.getItem(STORE_KEY); if (raw) { const o = JSON.parse(raw); for (const k of FIELDS) if (k in o) S[k] = o[k]; } } catch (e) { /* ignore */ }
+}
+
+/* ---------- charts (canvas, theme tokens read from CSS) ---------- */
+function niceStep(range, n) {
+  const raw = range / Math.max(1, n), p = Math.pow(10, Math.floor(Math.log10(raw))), r = raw / p;
+  return (r <= 1 ? 1 : r <= 2 ? 2 : r <= 5 ? 5 : 10) * p;
+}
+function linTicks(lo, hi, n) {
+  const step = niceStep(hi - lo, n), out = [];
+  for (let v = Math.ceil(lo / step - 1e-9) * step; v <= hi + 1e-9 * step; v += step) out.push(Math.abs(v) < 1e-12 * step ? 0 : v);
+  return { ticks: out, step };
+}
+function fmtLin(v, step) {
+  const d = Math.max(0, -Math.floor(Math.log10(step) + 1e-9));
+  if (v !== 0 && (Math.abs(v) >= 1e5 || Math.abs(v) < 1e-3)) return v.toExponential(1).replace('e+', 'e');
+  return v.toFixed(Math.min(d, 8));
+}
+function logTicks(lo, hi) {
+  const a = Math.floor(Math.log10(lo)), b = Math.ceil(Math.log10(hi)), major = [], minor = [];
+  for (let e = a; e <= b; e++) {
+    const d = Math.pow(10, e);
+    if (d >= lo && d <= hi) major.push(d);
+    for (let m = 2; m <= 9; m++) { const v = m * d; if (v >= lo && v <= hi) minor.push(v); }
+  }
+  return { major, minor };
+}
+function fmtLog(v) { const e = Math.round(Math.log10(v)); return (e >= -3 && e <= 4) ? String(Math.pow(10, e)) : '1e' + e; }
+function mixHex(a, b, w) {
+  const pa = [1, 3, 5].map(i => parseInt(a.slice(i, i + 2), 16)), pb = [1, 3, 5].map(i => parseInt(b.slice(i, i + 2), 16));
+  return 'rgb(' + pa.map((x, i) => Math.round(x + (pb[i] - x) * w)).join(',') + ')';
+}
+function drawChart(cv, spec) {
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth || 600, Hc = cv.clientHeight || 280;
+  const pw = Math.round(W * dpr), ph = Math.round(Hc * dpr);
+  if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, Hc);
+  const cs = getComputedStyle(cv), tok = n => cs.getPropertyValue(n).trim();
+  const ink = tok('--fg-2'), muted = tok('--muted'), grid = tok('--grid'), axis = tok('--axis'), surface = tok('--surface'), fg = tok('--fg'), line = tok('--line');
+  const font = '12px ' + tok('--font-ui'), small = '11px ' + tok('--font-ui');
+  const m = { l: spec.ml || 58, r: 14, t: 10, b: 34 };
+  const x0 = m.l, x1 = W - m.r, y0 = m.t, y1 = Hc - m.b;
+  const logx = !!spec.logx, logy = !!spec.logy;
+  let xlo = Infinity, xhi = -Infinity, ylo = Infinity, yhi = -Infinity;
+  for (const s of spec.series) for (let i = 0; i < s.x.length; i++) {
+    const x = s.x[i], y = s.y[i];
+    if (!Number.isFinite(x) || !Number.isFinite(y) || (logx && x <= 0) || (logy && y <= 0)) continue;
+    if (x < xlo) xlo = x; if (x > xhi) xhi = x; if (y < ylo) ylo = y; if (y > yhi) yhi = y;
+  }
+  if (spec.xlim) [xlo, xhi] = spec.xlim;
+  if (spec.ylim) [ylo, yhi] = spec.ylim;
+  else if (logy) { if (!(yhi > 0)) { ylo = 1e-3; yhi = 1; } ylo = Math.max(ylo, yhi * (spec.logFloor || 1e-5)); yhi *= 1.6; ylo /= 1.3; }
+  else { if (!Number.isFinite(ylo)) { ylo = 0; yhi = 1; } if (ylo > 0) ylo = 0; const pad = 0.07 * (yhi - ylo || 1); yhi += pad; if (ylo < 0) ylo -= pad; }
+  if (!Number.isFinite(xlo) || xlo === xhi) { xlo = 0; xhi = 1; }
+  if (ylo === yhi) { yhi = ylo + 1; }
+  const lx = v => logx ? Math.log10(v) : v, ly = v => logy ? Math.log10(v) : v;
+  const sx = x => x0 + (lx(x) - lx(xlo)) / (lx(xhi) - lx(xlo)) * (x1 - x0);
+  const sy = y => y1 - (ly(y) - ly(ylo)) / (ly(yhi) - ly(ylo)) * (y1 - y0);
+  ctx.font = font; ctx.textBaseline = 'middle'; ctx.lineWidth = 1;
+  /* grid + ticks */
+  const xt = logx ? logTicks(xlo, xhi) : linTicks(xlo, xhi, 6), yt = logy ? logTicks(ylo, yhi) : linTicks(ylo, yhi, 5);
+  ctx.strokeStyle = grid;
+  const xmaj = logx ? xt.major : xt.ticks, ymaj = logy ? yt.major : yt.ticks;
+  for (const v of xmaj) { const px = Math.round(sx(v)) + 0.5; ctx.beginPath(); ctx.moveTo(px, y0); ctx.lineTo(px, y1); ctx.stroke(); }
+  for (const v of ymaj) { const py = Math.round(sy(v)) + 0.5; ctx.beginPath(); ctx.moveTo(x0, py); ctx.lineTo(x1, py); ctx.stroke(); }
+  ctx.strokeStyle = axis;
+  ctx.beginPath(); ctx.moveTo(x0 + 0.5, y0); ctx.lineTo(x0 + 0.5, y1 + 0.5); ctx.lineTo(x1, y1 + 0.5); ctx.stroke();
+  ctx.fillStyle = muted; ctx.textAlign = 'center';
+  const xStep = logx ? 0 : xt.step;
+  for (const v of xmaj) ctx.fillText(logx ? fmtLog(v) : fmtLin(v, xStep), sx(v), y1 + 12);
+  ctx.textAlign = 'right';
+  const yStep = logy ? 0 : yt.step;
+  for (const v of ymaj) ctx.fillText(logy ? fmtLog(v) : fmtLin(v, yStep), x0 - 6, sy(v));
+  if (logy && yt.minor.length) { ctx.strokeStyle = grid; for (const v of yt.minor) { if (ymaj.length > 6) break; const py = Math.round(sy(v)) + 0.5; ctx.beginPath(); ctx.moveTo(x0, py); ctx.lineTo(x0 + 4, py); ctx.stroke(); } }
+  /* axis labels */
+  ctx.fillStyle = ink; ctx.textAlign = 'center'; ctx.font = small;
+  if (spec.xlabel) ctx.fillText(spec.xlabel, (x0 + x1) / 2, Hc - 7);
+  if (spec.ylabel) { ctx.save(); ctx.translate(12, (y0 + y1) / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(spec.ylabel, 0, 0); ctx.restore(); }
+  /* series */
+  ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip();
+  for (const s of spec.series) {
+    ctx.strokeStyle = s.color; ctx.lineWidth = s.width || 2; ctx.setLineDash(s.dash || []); ctx.lineJoin = 'round';
+    ctx.beginPath(); let pen = false;
+    for (let i = 0; i < s.x.length; i++) {
+      const x = s.x[i], y = s.y[i];
+      if (!Number.isFinite(y) || (logy && y <= 0) || (logx && x <= 0)) { pen = false; continue; }
+      const px = sx(x), py = Math.max(y0 - 2, Math.min(y1 + 2, sy(Math.max(y, logy ? ylo / 10 : -Infinity))));
+      if (!pen) { ctx.moveTo(px, py); pen = true; } else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  if (spec.hover && Number.isFinite(spec.hover.x)) {
+    const px = Math.round(sx(spec.hover.x)) + 0.5;
+    if (px >= x0 && px <= x1) { ctx.strokeStyle = ink; ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(px, y0); ctx.lineTo(px, y1); ctx.stroke(); ctx.setLineDash([]); }
+    for (const d of spec.hover.dots || []) { if (!Number.isFinite(d.y) || (logy && d.y <= 0)) continue; ctx.fillStyle = d.color; ctx.strokeStyle = surface; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx(spec.hover.x), sy(d.y), 4, 0, 2 * Math.PI); ctx.fill(); ctx.stroke(); }
+  }
+  if (spec.marker && Number.isFinite(spec.marker.y)) {
+    ctx.fillStyle = spec.marker.color; ctx.strokeStyle = surface; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(sx(spec.marker.x), sy(spec.marker.y), 5, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
+  /* direct labels with a surface halo */
+  if (spec.labels) { ctx.font = small; ctx.textAlign = 'left'; for (const L of spec.labels) { if (!Number.isFinite(L.y) || (logy && L.y <= 0)) continue; const px = Math.min(x1 - 40, Math.max(x0 + 2, sx(L.x) + (L.dx || 6))), py = Math.max(y0 + 8, sy(L.y) + (L.dy || -8)); ctx.lineWidth = 3; ctx.strokeStyle = surface; ctx.strokeText(L.text, px, py); ctx.fillStyle = ink; ctx.fillText(L.text, px, py); } }
+  /* legend */
+  if (spec.legend && spec.legend.length) {
+    ctx.font = small; ctx.textAlign = 'left';
+    const rows = spec.legend, wmax = Math.max(...rows.map(r => ctx.measureText(r.label).width)) + 30, h = rows.length * 16 + 8;
+    const lxp = x1 - wmax - 6, lyp = y0 + 6;
+    ctx.fillStyle = surface; ctx.globalAlpha = 0.85; ctx.fillRect(lxp, lyp, wmax, h); ctx.globalAlpha = 1; ctx.strokeStyle = line; ctx.strokeRect(lxp + 0.5, lyp + 0.5, wmax, h);
+    rows.forEach((r, i) => { const yy = lyp + 12 + i * 16; ctx.strokeStyle = r.color; ctx.lineWidth = 2; ctx.setLineDash(r.dash || []); ctx.beginPath(); ctx.moveTo(lxp + 7, yy); ctx.lineTo(lxp + 21, yy); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = fg; ctx.fillText(r.label, lxp + 26, yy); });
+  }
+  if (spec.gradient) {
+    const g = spec.gradient, gw = 90, gx = x1 - gw - 8, gy = y0 + 8;
+    const grd = ctx.createLinearGradient(gx, 0, gx + gw, 0); grd.addColorStop(0, g.c0); grd.addColorStop(1, g.c1);
+    ctx.fillStyle = surface; ctx.globalAlpha = 0.85; ctx.fillRect(gx - 34, gy - 6, gw + 70, 22); ctx.globalAlpha = 1;
+    ctx.fillStyle = grd; ctx.fillRect(gx, gy, gw, 8);
+    ctx.font = small; ctx.fillStyle = fg; ctx.textAlign = 'right'; ctx.fillText(g.l0, gx - 4, gy + 4); ctx.textAlign = 'left'; ctx.fillText(g.l1, gx + gw + 4, gy + 4);
+  }
+  /* readout box */
+  if (spec.hover && spec.hover.lines) {
+    ctx.font = small; ctx.textAlign = 'left';
+    const lines = spec.hover.lines, bw = Math.max(...lines.map(l => ctx.measureText(l).width)) + 16, bh = lines.length * 15 + 10;
+    let bx = sx(spec.hover.x) + 10; if (bx + bw > x1) bx = sx(spec.hover.x) - bw - 10; if (bx < x0) bx = x0 + 4;
+    const by = y1 - bh - 6;
+    ctx.fillStyle = surface; ctx.globalAlpha = 0.94; ctx.fillRect(bx, by, bw, bh); ctx.globalAlpha = 1; ctx.strokeStyle = line; ctx.strokeRect(bx + 0.5, by + 0.5, bw, bh);
+    ctx.fillStyle = fg; lines.forEach((l, i) => ctx.fillText(l, bx + 8, by + 12 + i * 15));
+  }
+  cv._scale = { x0, x1, xlo, xhi, logx };
+}
+function pxToX(cv, px) {
+  const s = cv._scale; if (!s) return NaN;
+  const f = (px - s.x0) / (s.x1 - s.x0);
+  if (f < 0 || f > 1) return NaN;
+  return s.logx ? Math.pow(10, Math.log10(s.xlo) + f * (Math.log10(s.xhi) - Math.log10(s.xlo))) : s.xlo + f * (s.xhi - s.xlo);
+}
+
+/* ---------- model evaluation ---------- */
+const calCache = new Map();
+function getCal(kind, p) {
+  const key = kind === 'custom' ? 'custom:' + S.customText : kind + ':' + (kind === 'supergauss' ? p.sgOrder : kind === 'square' ? p.edgePct : kind === 'qswitch' ? p.fallRise : '');
+  if (!calCache.has(key)) { if (calCache.size > 40) calCache.clear(); calCache.set(key, FN.calibrate(kind, p)); }
+  return calCache.get(key);
+}
+let R = null;                                    // last results
+function compute() {
+  const preset = PRESETS.find(p => p.id === S.preset);
+  const lam = S.lam * 1e-9, sa = Math.max(0, S.sa) * 1e-25, se = Math.max(0, S.se) * 1e-25, d = Math.max(1e-7, S.mfd) * 1e-6;
+  const med = FN.esatFrom(lam, sa, Math.max(se, sa > 0 ? 0 : 1e-30), d);
+  const Esat = S.esatDirectOn ? Math.max(1e-15, S.esatDirect * EU[S.esatUnit]) : Math.max(1e-15, med.Esat);
+  const G0 = Math.pow(10, S.gainDb / 10), lnG0 = Math.log(G0);
+  const Estored = Esat * lnG0;
+  /* shape */
+  let kind = S.shape, customErr = '';
+  const p = { sgOrder: S.sgOrder, edgePct: S.edgePct, fallRise: S.fallRise };
+  if (kind === 'custom') {
+    const c = FN.parseCustom(S.customText);
+    if (c.error) { customErr = c.error + ' Showing a Gaussian instead.'; kind = 'gauss'; } else p.custom = c;
+  }
+  const cal = getCal(kind, p);
+  let T = Math.max(1e-15, S.fwhm) * TU[S.tUnit];
+  if (kind === 'custom' && !S.customScale) T = cal.fwhm * TU[S.tUnit];          // keep the table's own time axis
+  const pulse = FN.buildPulse(cal, T), N = pulse.t.length, dt = pulse.dt;
+  let Eunit = 0; for (let i = 0; i < N; i++) Eunit += pulse.s[i]; Eunit *= dt;
+  const scale = S.specify === 'peak' ? Math.max(0, S.peak) * PU[S.pUnit] : Math.max(0, S.energy) * EU[S.eUnit] / Eunit;
+  const Pspec = new Float64Array(N); for (let i = 0; i < N; i++) Pspec[i] = pulse.s[i] * scale;
+  let Pin, Pout, G, Ein, Eout;
+  if (S.mode === 'inv') { const r = FN.inverse(Pspec, dt, Esat, G0); Pin = r.Pin; Pout = Pspec; G = r.G; Ein = r.Ein; Eout = r.Eout; }
+  else { const r = FN.forward(Pspec, dt, Esat, G0); Pin = Pspec; Pout = r.Pout; G = r.G; Ein = r.Ein; Eout = r.Eout; }
+  const sin = FN.stats(pulse.t, Pin, dt), sout = FN.stats(pulse.t, Pout, dt);
+  /* cumulative extracted fraction (for readout / table) */
+  const extracted = new Float64Array(N); let acc = 0;
+  for (let i = 0; i < N; i++) { acc += (Pout[i] - Pin[i]) * dt; extracted[i] = Estored > 0 ? acc / Estored : NaN; }
+  /* z evolution */
+  const M = Math.max(2, Math.min(41, Math.round(S.slices))), evo = [];
+  for (let j = 0; j < M; j++) { const f = j / (M - 1); evo.push(f === 0 ? Pin : f === 1 ? Pout : FN.forward(Pin, dt, Esat, Math.exp(f * lnG0)).Pout); }
+  /* energy sweep over the specified pulse's energy */
+  const Espec = S.mode === 'inv' ? Eout : Ein;
+  let lo = Math.log10(Esat * 1e-3), hi = Math.log10(Esat * 30);
+  if (Espec > 0) { lo = Math.min(lo, Math.log10(Espec) - 0.3); hi = Math.max(hi, Math.log10(Espec) + 0.3); }
+  const nsw = 90, sw = { E: [], gain: [], ratio: [], eta: [] }, fw0 = FN.fwhm(pulse.t, pulse.s), tmp = new Float64Array(N);
+  for (let q = 0; q < nsw; q++) {
+    const E = Math.pow(10, lo + (hi - lo) * q / (nsw - 1)), k = E / Eunit;
+    for (let i = 0; i < N; i++) tmp[i] = pulse.s[i] * k;
+    let r, ein, eout, w;
+    if (S.mode === 'inv') { r = FN.inverse(tmp, dt, Esat, G0); ein = r.Ein; eout = E; w = FN.fwhm(pulse.t, r.Pin) / fw0; }
+    else { r = FN.forward(tmp, dt, Esat, G0); ein = E; eout = r.Eout; w = FN.fwhm(pulse.t, r.Pout) / fw0; }
+    sw.E.push(E); sw.gain.push(dB(eout / ein)); sw.ratio.push(w); sw.eta.push(Estored > 0 ? 100 * (eout - ein) / Estored : NaN);
+  }
+  R = { preset, med, Esat, G0, lnG0, Estored, kind, customErr, cal, t: pulse.t, dt, s: pulse.s, Pin, Pout, G, Ein, Eout, sin, sout, extracted, evo, sw, T };
+}
+
+/* ---------- rendering ---------- */
+let hoverT = NaN;
+function cssTok(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function renderText() {
+  const inv = S.mode === 'inv', tu = TUL[S.tUnit];
+  $('h-pulse').textContent = inv ? 'Target output pulse' : 'Input pulse';
+  $('chipIn').textContent = inv ? 'computed' : 'specified'; $('chipIn').className = 'chip' + (inv ? '' : ' spec');
+  $('chipOut').textContent = inv ? 'specified' : 'computed'; $('chipOut').className = 'chip' + (inv ? ' spec' : '');
+  $('sweepTitle').textContent = inv ? 'Output-energy sweep' : 'Input-energy sweep';
+  $('sweepSub').textContent = inv ? 'Same target shape and gain, output energy swept. The dot marks the current setting.' : 'Same input shape and gain, input energy swept. The dot marks the current setting.';
+  $('swRatioTitle').textContent = inv ? 'FWHM ratio, required input / output' : 'FWHM ratio, out / in';
+  /* amplifier derived */
+  const m = R.med, tauTxt = R.preset && R.preset.tau ? sig(R.preset.tau * 1e3) + ' ms' : 'n/a';
+  $('ampDerived').innerHTML =
+    `<span>Photon energy hν</span><b>${sig(FN.H * FN.C0 / (S.lam * 1e-9) / 1.602176634e-19)} eV</b>` +
+    `<span>Saturation fluence J<sub>sat</sub></span><b>${S.esatDirectOn ? '—' : sig(m.Jsat / 1e4) + ' J/cm²'}</b>` +
+    `<span>Effective area A<sub>eff</sub></span><b>${sig(m.Aeff * 1e12)} µm²</b>` +
+    `<span>Saturation energy E<sub>sat</sub></span><b>${fmtE(R.Esat)}</b>` +
+    `<span>Small-signal gain G<sub>0</sub></span><b>${sig(R.G0, 4)}×</b>` +
+    `<span>Extractable stored energy E<sub>sat</sub> ln G<sub>0</sub></span><b>${fmtE(R.Estored)}</b>` +
+    `<span>Upper-state lifetime (preset)</span><b>${tauTxt}</b>`;
+  /* KPIs */
+  const net = dB(R.Eout / R.Ein), eta = R.Estored > 0 ? (R.Eout - R.Ein) / R.Estored : NaN;
+  $('kpiGain').innerHTML = `${sig(net, 3)}<small>dB</small>`;
+  $('kpiGainS').textContent = `small-signal ${sig(S.gainDb, 3)} dB, compressed by ${sig(S.gainDb - net, 2)} dB`;
+  $('kpiEta').innerHTML = Number.isFinite(eta) ? `${sig(100 * eta, 3)}<small>%</small>` : '—';
+  $('kpiEtaS').textContent = Number.isFinite(eta) ? `${fmtE(R.Eout - R.Ein)} of ${fmtE(R.Estored)} stored` : (S.gainDb <= 0 ? 'no stored energy at G₀ ≤ 0 dB' : '');
+  $('kpiEk').textContent = inv ? 'Required input energy' : 'Output energy';
+  $('kpiE').textContent = inv ? fmtE(R.Ein) : fmtE(R.Eout);
+  $('kpiES').textContent = inv ? `for ${fmtE(R.Eout)} out, peak ${fmtPow(R.sin.Ppk)}` : `from ${fmtE(R.Ein)} in, peak ${fmtPow(R.sout.Ppk)}`;
+  /* warnings */
+  const W = [];
+  if (R.customErr) W.push(['crit', R.customErr]);
+  if (S.gainDb < 0) W.push(['info', 'G₀ is below 0 dB: the medium absorbs. The same equations then describe a saturable absorber bleaching, with E_sat as its saturation energy.']);
+  if (R.preset && R.preset.tau && R.T > 0.1 * R.preset.tau) W.push(['warn', `Pulse FWHM ${fmtT(R.T)} is not short against the ${sig(R.preset.tau * 1e6)} µs upper-state lifetime of this medium; the model ignores pumping and decay during the pulse.`]);
+  if (R.T < 1e-12) W.push(['warn', 'Pulses shorter than about 1 ps leave the rate-equation regime: coherent effects, finite gain bandwidth and dispersion are not in this model.']);
+  if (!inv && S.gainDb > 0 && S.gainDb - net > 10) W.push(['info', `Deep saturation: the gain is compressed by ${sig(S.gainDb - net, 2)} dB. The leading edge sees ${sig(S.gainDb, 3)} dB while the trailing edge sees ${sig(dB(R.G[lastAbove(R.Pin, 1e-3)]), 2)} dB.`]);
+  if (inv && R.Estored > 0 && R.Eout > R.Estored) W.push(['warn', `The requested output (${fmtE(R.Eout)}) exceeds the extractable stored energy (${fmtE(R.Estored)}); the seed must supply ${fmtE(R.Ein)} and the amplifier only adds ${sig(net, 2)} dB.`]);
+  if (inv && R.Ein > 0.5 * R.Eout && !(R.Estored > 0 && R.Eout > R.Estored)) W.push(['info', `Net gain is only ${sig(net, 2)} dB: most of the output energy comes from the seed.`]);
+  if (R.sin.Ppk > 0 && R.sin.fwhm < 20 * R.dt) W.push(['warn', 'The pulse is resolved by fewer than 20 samples at half maximum; widen the shape support or use a simpler shape for accurate widths.']);
+  $('warnings').innerHTML = W.map(([lvl, txt]) => `<li class="${lvl}"><span class="ico">${lvl === 'info' ? 'i' : '!'}</span><span>${txt}</span></li>`).join('');
+  /* comparison table */
+  const rows = [
+    ['Energy', fmtE(R.sin.E), fmtE(R.sout.E), `${sig(dB(R.sout.E / R.sin.E), 3)} dB`],
+    ['Peak power', fmtPow(R.sin.Ppk), fmtPow(R.sout.Ppk), `×${sig(R.sout.Ppk / R.sin.Ppk, 3)}`],
+    ['FWHM', fmtT(R.sin.fwhm), fmtT(R.sout.fwhm), `×${sig(R.sout.fwhm / R.sin.fwhm, 3)}`],
+    ['Rise 10–90 %', fmtT(R.sin.rise), fmtT(R.sout.rise), `×${sig(R.sout.rise / R.sin.rise, 3)}`],
+    ['Fall 90–10 %', fmtT(R.sin.fall), fmtT(R.sout.fall), `×${sig(R.sout.fall / R.sin.fall, 3)}`],
+    ['Peak time', fmtT(R.sin.tpk), fmtT(R.sout.tpk), `${sig((R.sout.tpk - R.sin.tpk) / TU[S.tUnit], 3)} ${tu}`],
+    ['Centroid', fmtT(R.sin.centroid), fmtT(R.sout.centroid), `${sig((R.sout.centroid - R.sin.centroid) / TU[S.tUnit], 3)} ${tu}`],
+    ['Gain at the leading edge / trailing edge', '', '', `${sig(dB(R.G[firstAbove(R.Pin, 1e-3)]), 3)} dB / ${sig(dB(R.G[lastAbove(R.Pin, 1e-3)]), 3)} dB`],
+  ];
+  $('cmpBody').innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td class="num">${r[1]}</td><td class="num">${r[2]}</td><td class="num">${r[3]}</td></tr>`).join('');
+  /* data table */
+  $('dtT').textContent = `t (${tu})`;
+  const N = R.t.length, step = Math.max(1, Math.floor(N / 24)), tr = [];
+  for (let i = 0; i < N; i += step) tr.push(`<tr><td class="num">${sig(R.t[i] / TU[S.tUnit], 4)}</td><td class="num">${sig(R.Pin[i])}</td><td class="num">${sig(R.Pout[i])}</td><td class="num">${sig(dB(R.G[i]), 4)}</td><td class="num">${sig(100 * R.extracted[i])}</td></tr>`);
+  $('dataBody').innerHTML = tr.join('');
+}
+function firstAbove(P, frac) { const m = P[FN.argmax(P)] * frac; let i = 0; while (i < P.length - 1 && P[i] < m) i++; return i; }
+function lastAbove(P, frac) { const m = P[FN.argmax(P)] * frac; let i = P.length - 1; while (i > 0 && P[i] < m) i--; return i; }
+
+function renderCharts() {
+  const cin = cssTok('--c-in'), cout = cssTok('--c-out'), cg = cssTok('--c-gain'), r0 = cssTok('--ramp-0'), r1 = cssTok('--ramp-1');
+  const tu = TUL[S.tUnit], N = R.t.length, xs = new Float64Array(N);
+  for (let i = 0; i < N; i++) xs[i] = R.t[i] / TU[S.tUnit];
+  const inv = S.mode === 'inv';
+  /* pulse chart */
+  let yin = R.Pin, yout = R.Pout, ylabel = 'power (W)';
+  if (S.normalize) { yin = new Float64Array(N); yout = new Float64Array(N); for (let i = 0; i < N; i++) { yin[i] = R.Pin[i] / R.sin.Ppk; yout[i] = R.Pout[i] / R.sout.Ppk; } ylabel = 'power / peak'; }
+  let hover = null;
+  if (Number.isFinite(hoverT)) {
+    const i = Math.max(0, Math.min(N - 1, Math.round((hoverT * TU[S.tUnit] - R.t[0]) / R.dt)));
+    hover = { x: xs[i], dots: [{ y: yin[i], color: cin }, { y: yout[i], color: cout }], lines: [
+      `t = ${sig(xs[i], 4)} ${tu}`, `P_in = ${fmtPow(R.Pin[i])}`, `P_out = ${fmtPow(R.Pout[i])}`, `G(t) = ${sig(dB(R.G[i]), 3)} dB`,
+      Number.isFinite(R.extracted[i]) ? `extracted so far = ${sig(100 * R.extracted[i], 3)} %` : 'extracted: n/a'] };
+  }
+  const ipk = FN.argmax(R.Pin), opk = FN.argmax(R.Pout);
+  drawChart($('cvPulse'), {
+    xlabel: `time (${tu})`, ylabel, logy: S.logy, logFloor: 1e-6,
+    series: [{ x: xs, y: yin, color: cin, width: 2 }, { x: xs, y: yout, color: cout, width: 2 }],
+    legend: [{ color: cin, label: inv ? 'required input' : 'input' }, { color: cout, label: inv ? 'target output' : 'output' }],
+    labels: [{ x: xs[ipk], y: yin[ipk], text: 'in', dx: -22 }, { x: xs[opk], y: yout[opk], text: 'out', dx: 6 }],
+    hover,
+  });
+  /* gain chart */
+  const gdb = new Float64Array(N); for (let i = 0; i < N; i++) gdb[i] = dB(R.G[i]);
+  drawChart($('cvGain'), {
+    xlabel: `time (${tu})`, ylabel: 'instantaneous gain (dB)',
+    series: [{ x: xs, y: gdb, color: cg, width: 2 }],
+    ylim: [Math.min(0, S.gainDb) - 1, Math.max(0, S.gainDb) + 1],
+    hover: hover ? { x: hover.x } : null,
+  });
+  /* evolution */
+  const M = R.evo.length, es = [];
+  for (let j = 0; j < M; j++) {
+    const P = R.evo[j]; let y = P;
+    if (S.evoNorm) { const pk = P[FN.argmax(P)] || 1; y = new Float64Array(N); for (let i = 0; i < N; i++) y[i] = P[i] / pk; }
+    es.push({ x: xs, y, color: mixHex(r0, r1, j / (M - 1)), width: j === M - 1 ? 2.2 : 1.4 });
+  }
+  drawChart($('cvEvo'), { xlabel: `time (${tu})`, ylabel: S.evoNorm ? 'power / peak of slice' : 'power (W)', logy: !S.evoNorm && S.logy, logFloor: 1e-6, series: es, gradient: { c0: mixHex(r0, r1, 0), c1: mixHex(r0, r1, 1), l0: 'z = 0', l1: 'z = L' } });
+  /* sweep small multiples */
+  const Eu = EU[S.eUnit], ex = R.sw.E.map(e => e / Eu), Ecur = (inv ? R.Eout : R.Ein) / Eu, xl = `${inv ? 'output' : 'input'} energy (${EUL[S.eUnit]})`;
+  const net = dB(R.Eout / R.Ein), eta = R.Estored > 0 ? 100 * (R.Eout - R.Ein) / R.Estored : NaN;
+  const wr = inv ? R.sin.fwhm / R.sout.fwhm : R.sout.fwhm / R.sin.fwhm;
+  drawChart($('cvSw1'), { ml: 46, xlabel: xl, logx: true, series: [{ x: ex, y: R.sw.gain, color: cg }], marker: { x: Ecur, y: net, color: cg } });
+  drawChart($('cvSw2'), { ml: 46, xlabel: xl, logx: true, series: [{ x: ex, y: R.sw.ratio, color: cg }], marker: { x: Ecur, y: wr, color: cg } });
+  drawChart($('cvSw3'), { ml: 46, xlabel: xl, logx: true, series: [{ x: ex, y: R.sw.eta, color: cg }], marker: { x: Ecur, y: eta, color: cg } });
+}
+function updateVisibility() {
+  const k = S.shape;
+  $('row-sgOrder').style.display = k === 'supergauss' ? '' : 'none';
+  $('row-edgePct').style.display = k === 'square' ? '' : 'none';
+  $('row-fallRise').style.display = k === 'qswitch' ? '' : 'none';
+  $('row-custom').style.display = k === 'custom' ? '' : 'none';
+  $('row-energy').style.display = S.specify === 'peak' ? 'none' : '';
+  $('row-peak').style.display = S.specify === 'peak' ? '' : 'none';
+  $('esatDirectRow').style.display = S.esatDirectOn ? '' : 'none';
+  for (const id of ['lam', 'sa', 'se', 'mfd']) $(id).disabled = S.esatDirectOn;
+  $('fwhm').disabled = k === 'custom' && !S.customScale;
+  $('customErr').textContent = R ? R.customErr : '';
+}
+let raf = 0;
+function update(fromForm = true) {
+  if (fromForm) readForm();
+  if (raf) return;
+  raf = requestAnimationFrame(() => {
+    raf = 0;
+    compute(); updateVisibility(); renderText(); renderCharts(); save();
+  });
+}
+
+/* ---------- wiring ---------- */
+function init() {
+  const sel = $('preset');
+  for (const p of PRESETS) { const o = document.createElement('option'); o.value = p.id; o.textContent = p.name; sel.appendChild(o); }
+  load(); writeForm();
+  document.querySelectorAll('input, select, textarea').forEach(el => {
+    if (el.id === 'customFile') return;
+    el.addEventListener('input', () => {
+      if (el.id === 'gainRange') $('gainDb').value = el.value;
+      if (el.id === 'gainDb') $('gainRange').value = el.value;
+      if (['lam', 'sa', 'se', 'mfd'].includes(el.id)) $('preset').value = 'custom';
+      if (el.id === 'preset') applyPreset(el.value);
+      update();
+    });
+  });
+  $('customFile').addEventListener('change', ev => {
+    const f = ev.target.files && ev.target.files[0]; if (!f) return;
+    const rd = new FileReader(); rd.onload = () => { $('customText').value = String(rd.result); $('shape').value = 'custom'; update(); }; rd.readAsText(f);
+  });
+  $('reset').addEventListener('click', () => { S = { ...DEFAULTS }; writeForm(); try { localStorage.removeItem(STORE_KEY); } catch (e) { /* ignore */ } update(); });
+  $('copyCsv').addEventListener('click', copyCsv);
+  const onMove = ev => {
+    const cv = ev.currentTarget, rect = cv.getBoundingClientRect();
+    const x = pxToX(cv, ev.clientX - rect.left);
+    hoverT = Number.isFinite(x) ? x : NaN; renderCharts();
+  };
+  for (const id of ['cvPulse', 'cvGain']) { const cv = $(id); cv.addEventListener('pointermove', onMove); cv.addEventListener('pointerleave', () => { hoverT = NaN; renderCharts(); }); }
+  if (window.ResizeObserver) { const ro = new ResizeObserver(() => { if (R) renderCharts(); }); ro.observe($('cvPulse')); ro.observe($('cvSw1')); }
+  else window.addEventListener('resize', () => R && renderCharts());
+  if (window.matchMedia) { const mq = window.matchMedia('(prefers-color-scheme: dark)'); if (mq.addEventListener) mq.addEventListener('change', () => R && renderCharts()); }
+  new MutationObserver(() => R && renderCharts()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  update(true);
+}
+function applyPreset(id) {
+  const p = PRESETS.find(q => q.id === id); if (!p || p.id === 'custom') return;
+  $('lam').value = p.lam; $('sa').value = p.sa; $('se').value = p.se; $('mfd').value = p.mfd;
+}
+function copyCsv() {
+  if (!R) return;
+  const tu = TUL[S.tUnit], lines = [`t_${tu},P_in_W,P_out_W,gain_dB,extracted_fraction`];
+  for (let i = 0; i < R.t.length; i++) lines.push(`${(R.t[i] / TU[S.tUnit]).toPrecision(7)},${R.Pin[i].toPrecision(7)},${R.Pout[i].toPrecision(7)},${dB(R.G[i]).toPrecision(7)},${Number.isFinite(R.extracted[i]) ? R.extracted[i].toPrecision(6) : ''}`);
+  const text = lines.join('\n'), msg = $('copyMsg');
+  const done = ok => { msg.textContent = ok ? `Copied ${R.t.length} rows.` : 'Clipboard blocked: select the data table and copy manually.'; setTimeout(() => { msg.textContent = ''; }, 4000); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => done(true), () => fallbackCopy(text, done));
+  else fallbackCopy(text, done);
+}
+function fallbackCopy(text, done) {
+  const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.left = '-9999px';
+  document.body.appendChild(ta); ta.select();
+  let ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  document.body.removeChild(ta); done(ok);
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
+</body>
+</html>
