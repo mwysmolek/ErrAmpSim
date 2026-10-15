@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Frantz–Nodvik Pulse Amplifier</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="Interactive Frantz–Nodvik gain-saturation calculator: see how a pulse is reshaped by a laser amplifier, or work backwards to the seed shape that produces a wanted output.">
+<meta name="description" content="Interactive Frantz–Nodvik gain-saturation calculator: define the amplifier from a fibre datasheet, see how the pulse is reshaped, or work backwards to the seed shape that produces a wanted output.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -69,14 +69,17 @@ header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-cont
 .seg span { display: inline-block; padding: 6px 14px; border-radius: 999px; font-weight: 500; font-size: 0.92rem; color: var(--fg-2); }
 .seg input:checked + span { background: var(--accent); color: var(--accent-fg); }
 .seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.seg.small { background: var(--surface-2); border-color: transparent; justify-self: start; }
+.seg.small span { padding: 4px 11px; font-size: 0.86rem; }
 
-.workspace { display: grid; grid-template-columns: 350px minmax(0, 1fr); gap: 20px; align-items: start; }
+.workspace { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 20px; align-items: start; }
 @media (max-width: 960px) { .workspace { grid-template-columns: 1fr; } }
 .rail { display: grid; gap: 14px; min-width: 0; }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px 16px; display: grid; gap: 10px; }
 .panel h2 { padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.block { display: grid; gap: 10px; }
 .field { display: grid; grid-template-columns: minmax(0, 1fr) 104px; gap: 8px; align-items: center; }
-.field.with-unit { grid-template-columns: minmax(0, 1fr) 104px 66px; }
+.field.with-unit { grid-template-columns: minmax(0, 1fr) 96px 74px; }
 .field > label { font-size: 0.92rem; color: var(--fg-2); min-width: 0; }
 .field .hint { display: block; font-size: 0.78rem; color: var(--muted); }
 input[type="number"], input[type="text"], select, textarea {
@@ -84,6 +87,7 @@ input[type="number"], input[type="text"], select, textarea {
   border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; width: 100%; min-width: 0;
 }
 input[type="number"] { font-variant-numeric: tabular-nums; }
+input:disabled, select:disabled { opacity: 0.55; }
 select { font-family: var(--font-ui); }
 textarea { resize: vertical; min-height: 96px; line-height: 1.35; }
 input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
@@ -91,19 +95,21 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: 0.92rem; color: var(--fg-2); cursor: pointer; }
 .check input { accent-color: var(--accent); margin: 0; }
 .derived { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; font-size: 0.86rem; color: var(--fg-2); background: var(--surface-2); border-radius: 4px; padding: 8px 10px; }
-.derived b { font-family: var(--font-mono); font-weight: 500; color: var(--fg); font-variant-numeric: tabular-nums; text-align: right; }
+.derived b { font-family: var(--font-mono); font-weight: 500; color: var(--fg); font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
+.derived .sep { grid-column: 1 / -1; border-top: 1px solid var(--line); margin: 4px 0 2px; }
 .btn { font: inherit; font-size: 0.88rem; font-weight: 500; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 5px 12px; cursor: pointer; }
 .btn:hover { border-color: var(--accent); }
-.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 .err { color: var(--crit); font-size: 0.85rem; }
 
 .results { display: grid; gap: 14px; min-width: 0; }
-.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-@media (max-width: 560px) { .kpis { grid-template-columns: 1fr; } }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1240px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .kpis { grid-template-columns: 1fr; } }
 .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; min-width: 0; }
 .kpi .k { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-.kpi .v { font-size: 1.7rem; font-weight: 600; line-height: 1.15; margin-top: 2px; }
+.kpi .v { font-size: 1.6rem; font-weight: 600; line-height: 1.15; margin-top: 2px; }
 .kpi .v small { font-size: 0.95rem; font-weight: 500; color: var(--fg-2); margin-left: 3px; }
+.kpi .v .arrow { color: var(--muted); font-weight: 400; margin: 0 4px; }
 .kpi .s { font-size: 0.85rem; color: var(--fg-2); margin-top: 2px; }
 .warnings { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .warnings:empty { display: none; }
@@ -143,9 +149,6 @@ details.data table { min-width: 480px; }
 .prose math { font-size: 1.08em; color: var(--fg); }
 .prose math[display="block"] { margin: 6px 0; overflow-x: auto; max-width: 100%; }
 .prose .eq { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; overflow-x: auto; }
-.prose table.vars { border-collapse: collapse; font-size: 0.92rem; width: 100%; }
-.prose table.vars td { padding: 4px 8px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--fg-2); }
-.prose table.vars td:first-child { white-space: nowrap; color: var(--fg); }
 .refs ol li { padding-left: 4px; }
 .refs .id { font-family: var(--font-mono); font-size: 0.85em; color: var(--muted); margin-right: 4px; }
 footer.foot { max-width: 76ch; margin: 36px auto 0; font-size: 0.85rem; color: var(--muted); }
@@ -157,7 +160,7 @@ footer.foot { max-width: 76ch; margin: 36px auto 0; font-size: 0.85rem; color: v
 <header class="top">
   <div>
     <h1>Frantz–Nodvik Pulse Amplifier</h1>
-    <p class="tagline">Gain saturation reshapes a pulse as it extracts stored energy. Run it forwards to see the output, or backwards to find the seed shape that produces a wanted output.</p>
+    <p class="tagline">Gain saturation reshapes a pulse as it extracts stored energy. Define the amplifier from a fibre datasheet or by its saturation energy and gain, run it forwards to see the output, or backwards to find the seed that produces a wanted output.</p>
   </div>
   <fieldset class="seg" id="modeSeg">
     <legend class="sr-only">Calculation direction</legend>
@@ -170,38 +173,128 @@ footer.foot { max-width: 76ch; margin: 36px auto 0; font-size: 0.85rem; color: v
 <aside class="rail">
   <section class="panel" aria-labelledby="h-amp">
     <h2 id="h-amp">Amplifier</h2>
-    <div class="field">
-      <label for="preset">Gain medium preset</label>
-      <select id="preset" style="grid-column: 1 / -1"></select>
+    <fieldset class="seg small" style="margin: 0; padding: 3px;">
+      <legend class="sr-only">Define the amplifier by</legend>
+      <label><input type="radio" name="ampMode" value="fibre" id="ampMode-fibre"><span>Fibre datasheet</span></label>
+      <label><input type="radio" name="ampMode" value="simple" id="ampMode-simple"><span>E<sub>sat</sub> &amp; gain</span></label>
+    </fieldset>
+
+    <div class="block" id="fibreBlock">
+      <div class="field">
+        <label for="fibrePreset">Fibre preset</label>
+        <select id="fibrePreset" style="grid-column: 1 / -1"></select>
+      </div>
+      <div class="field">
+        <label for="dopant">Dopant / host <span class="hint">cross-section table</span></label>
+        <select id="dopant" style="grid-column: 1 / -1">
+          <option value="er-al">Er, aluminosilicate</option>
+          <option value="er-p">Er, phosphosilicate</option>
+          <option value="yb">Yb, phosphosilicate</option>
+        </select>
+      </div>
+      <div class="field with-unit">
+        <label for="absRef">Absorption at λ<sub>ref</sub> <span class="hint">dB/m, datasheet figure</span></label>
+        <input type="number" id="absRef" min="0" step="any">
+        <select id="absKind"><option value="core">core</option><option value="clad">cladding</option></select>
+      </div>
+      <div class="field">
+        <label for="lamRef">λ<sub>ref</sub> of that figure <span class="hint">nm (1530 for Er, 976 for Yb)</span></label>
+        <input type="number" id="lamRef" min="800" step="1">
+      </div>
+      <div class="field">
+        <label for="coreD">Core diameter <span class="hint">µm, whole core doped</span></label>
+        <input type="number" id="coreD" min="0.5" step="0.5">
+      </div>
+      <div class="field with-unit">
+        <label for="modeVal">Mode size from <span class="hint">NA → Marcuse LP01, or MFD at the signal</span></label>
+        <input type="number" id="modeVal" min="0" step="any">
+        <select id="modeKind"><option value="na">NA</option><option value="mfd">MFD µm</option></select>
+      </div>
+      <div class="field">
+        <label for="cladD">Cladding diameter <span class="hint">µm, for cladding figures and cladding pumping</span></label>
+        <input type="number" id="cladD" min="1" step="5">
+      </div>
+      <div class="field">
+        <label for="fibL">Fibre length <span class="hint">m</span></label>
+        <input type="number" id="fibL" min="0.01" step="0.1">
+      </div>
+      <div class="field">
+        <label for="bgLoss">Background loss <span class="hint">dB/m at the signal, folded into G<sub>0</sub></span></label>
+        <input type="number" id="bgLoss" min="0" step="0.01">
+      </div>
+      <div class="field">
+        <label for="lamS">Signal wavelength <span class="hint">nm</span></label>
+        <input type="number" id="lamS" min="800" step="1">
+      </div>
+      <div class="row" role="radiogroup" aria-label="Gain from">
+        <span style="font-size: 0.92rem; color: var(--fg-2);">Gain from</span>
+        <label class="check"><input type="radio" name="gainFrom" value="inv" id="gainFrom-inv"> average inversion</label>
+        <label class="check"><input type="radio" name="gainFrom" value="pump" id="gainFrom-pump"> pump estimate</label>
+      </div>
+      <div class="field" id="invBlock">
+        <label for="n2">Upper-state fraction n<sub>2</sub> <span class="hint">pre-pulse, averaged along the fibre</span></label>
+        <input type="number" id="n2" min="0" max="1" step="0.01">
+        <input type="range" id="n2Range" min="0" max="1" step="0.01" style="grid-column: 1 / -1" aria-label="Inversion slider">
+      </div>
+      <div class="block" id="pumpBlock">
+        <div class="field">
+          <label for="pumpP">Pump power <span class="hint">W, continuous</span></label>
+          <input type="number" id="pumpP" min="0" step="0.1">
+        </div>
+        <div class="field with-unit">
+          <label for="pumpLam">Pump wavelength <span class="hint">nm, and where it is launched</span></label>
+          <input type="number" id="pumpLam" min="800" step="1">
+          <select id="pumpGeom"><option value="core">core</option><option value="clad">cladding</option></select>
+        </div>
+        <div class="field">
+          <label for="repRate">Repetition rate <span class="hint">kHz</span></label>
+          <input type="number" id="repRate" min="0.001" step="any">
+        </div>
+        <div class="field">
+          <label for="tau2">Upper-state lifetime <span class="hint">ms</span></label>
+          <input type="number" id="tau2" min="0.001" step="any">
+        </div>
+        <div class="field">
+          <label for="aseCap">ASE gain cap <span class="hint">dB, clamps the inversion</span></label>
+          <input type="number" id="aseCap" min="0" step="1">
+        </div>
+      </div>
     </div>
-    <div class="field">
-      <label for="lam">Wavelength <span class="hint">nm</span></label>
-      <input type="number" id="lam" min="200" step="1">
-    </div>
-    <div class="field">
-      <label for="sa">σ<sub>a</sub> absorption <span class="hint">×10⁻²⁵ m² (= 10⁻²¹ cm²)</span></label>
-      <input type="number" id="sa" min="0" step="0.1">
-    </div>
-    <div class="field">
-      <label for="se">σ<sub>e</sub> emission <span class="hint">×10⁻²⁵ m²</span></label>
-      <input type="number" id="se" min="0" step="0.1">
-    </div>
-    <div class="field">
-      <label for="mfd">Mode-field / beam diameter <span class="hint">µm (1/e², A<sub>eff</sub> = π d²/4)</span></label>
-      <input type="number" id="mfd" min="0.1" step="0.5">
-    </div>
-    <div class="row">
-      <label class="check"><input type="checkbox" id="esatDirectOn"> Set E<sub>sat</sub> directly</label>
-    </div>
-    <div class="field with-unit" id="esatDirectRow">
-      <label for="esatDirect">Saturation energy E<sub>sat</sub></label>
-      <input type="number" id="esatDirect" min="0" step="any">
-      <select id="esatUnit"><option value="nJ">nJ</option><option value="uJ">µJ</option><option value="mJ">mJ</option></select>
-    </div>
-    <div class="field">
-      <label for="gainDb">Small-signal gain G<sub>0</sub> <span class="hint">dB, single pass</span></label>
-      <input type="number" id="gainDb" step="0.5">
-      <input type="range" id="gainRange" min="-10" max="60" step="0.5" style="grid-column: 1 / -1" aria-label="Small-signal gain slider">
+
+    <div class="block" id="simpleBlock">
+      <div class="field">
+        <label for="preset">Gain medium preset</label>
+        <select id="preset" style="grid-column: 1 / -1"></select>
+      </div>
+      <div class="field">
+        <label for="lam">Wavelength <span class="hint">nm</span></label>
+        <input type="number" id="lam" min="200" step="1">
+      </div>
+      <div class="field">
+        <label for="sa">σ<sub>a</sub> absorption <span class="hint">×10⁻²⁵ m² (= 10⁻²¹ cm²)</span></label>
+        <input type="number" id="sa" min="0" step="0.1">
+      </div>
+      <div class="field">
+        <label for="se">σ<sub>e</sub> emission <span class="hint">×10⁻²⁵ m²</span></label>
+        <input type="number" id="se" min="0" step="0.1">
+      </div>
+      <div class="field">
+        <label for="mfd">Mode-field / beam diameter <span class="hint">µm (1/e², A<sub>eff</sub> = π d²/4)</span></label>
+        <input type="number" id="mfd" min="0.1" step="0.5">
+      </div>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="esatDirectOn"> Set E<sub>sat</sub> directly</label>
+      </div>
+      <div class="field with-unit" id="esatDirectRow">
+        <label for="esatDirect">Saturation energy E<sub>sat</sub></label>
+        <input type="number" id="esatDirect" min="0" step="any">
+        <select id="esatUnit"><option value="nJ">nJ</option><option value="uJ">µJ</option><option value="mJ">mJ</option></select>
+      </div>
+      <div class="field">
+        <label for="gainDb">Small-signal gain G<sub>0</sub> <span class="hint">dB, single pass</span></label>
+        <input type="number" id="gainDb" step="0.5">
+        <input type="range" id="gainRange" min="-10" max="60" step="0.5" style="grid-column: 1 / -1" aria-label="Small-signal gain slider">
+      </div>
     </div>
     <div class="derived" id="ampDerived"></div>
   </section>
@@ -236,7 +329,7 @@ footer.foot { max-width: 76ch; margin: 36px auto 0; font-size: 0.85rem; color: v
       <label for="fallRise">Fall / rise time ratio <span class="hint">1/[e<sup>−t/τr</sup> + e<sup>t/τf</sup>]²</span></label>
       <input type="number" id="fallRise" min="0.05" max="50" step="0.5">
     </div>
-    <div id="row-custom" style="display: grid; gap: 6px;">
+    <div id="row-custom" class="block" style="gap: 6px;">
       <label for="customText" style="font-size: 0.92rem; color: var(--fg-2);">Samples: one <code>t, P</code> pair per line (or P only, uniform spacing). Any units; negative P is clipped.</label>
       <textarea id="customText" spellcheck="false"></textarea>
       <div class="row">
@@ -284,13 +377,14 @@ footer.foot { max-width: 76ch; margin: 36px auto 0; font-size: 0.85rem; color: v
 <main class="results">
   <div class="kpis" aria-live="polite">
     <div class="kpi"><div class="k">Net gain</div><div class="v" id="kpiGain">—</div><div class="s" id="kpiGainS"></div></div>
+    <div class="kpi"><div class="k">Pulse width, in → out</div><div class="v" id="kpiW">—</div><div class="s" id="kpiWS"></div></div>
     <div class="kpi"><div class="k">Extraction efficiency</div><div class="v" id="kpiEta">—</div><div class="s" id="kpiEtaS"></div></div>
     <div class="kpi"><div class="k" id="kpiEk">Output energy</div><div class="v" id="kpiE">—</div><div class="s" id="kpiES"></div></div>
   </div>
   <ul class="warnings" id="warnings"></ul>
 
   <section class="card">
-    <header><h3>Pulse shapes</h3><p>Hover or touch for a readout. Blue is the input, orange the output.</p></header>
+    <header><h3>Pulse shapes</h3><p id="pulseSub">Hover or touch for a readout. Blue is the input, orange the output.</p></header>
     <canvas class="chart tall" id="cvPulse" role="img" aria-label="Input and output pulse power versus time"></canvas>
   </section>
 
@@ -300,7 +394,7 @@ footer.foot { max-width: 76ch; margin: 36px auto 0; font-size: 0.85rem; color: v
   </section>
 
   <section class="card">
-    <header><h3>Shape along the amplifier</h3><p>Pulse after a fraction z/L of the gain, assuming uniform small-signal gain per unit length.</p></header>
+    <header><h3>Shape along the amplifier</h3><p id="evoSub">Pulse after a fraction z/L of the gain, assuming uniform small-signal gain per unit length.</p></header>
     <canvas class="chart" id="cvEvo" role="img" aria-label="Pulse shape at successive positions along the amplifier"></canvas>
   </section>
 
@@ -357,7 +451,7 @@ footer.foot { max-width: 76ch; margin: 36px auto 0; font-size: 0.85rem; color: v
     <mspace width="1.6em"></mspace>
     <mi>u</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><msub><mi>J</mi><mtext>in</mtext></msub><mo>(</mo><mi>t</mi><mo>)</mo><mo>/</mo><msub><mi>J</mi><mtext>sat</mtext></msub>
   </mrow></math></div>
-  <p>The gain starts at <math><msub><mi>G</mi><mn>0</mn></msub></math> for the leading edge and falls towards 1 as the pulse extracts the inversion, which is why the front of the pulse is amplified more than the back: the output steepens, its peak moves forward and, for a Gaussian, it narrows.</p>
+  <p>The gain starts at <math><msub><mi>G</mi><mn>0</mn></msub></math> for the leading edge and falls towards 1 as the pulse extracts the inversion, which is why the front of the pulse is amplified more than the back: the output steepens, its peak moves forward and, for a Gaussian, it narrows. How much depends on two numbers only: <math><msub><mi>G</mi><mn>0</mn></msub><msub><mi>E</mi><mtext>in</mtext></msub><mo>/</mo><msub><mi>E</mi><mtext>sat</mtext></msub></math> decides whether saturation starts at all (below about 0.3 the pulse comes out with the input shape, just larger), and <math><msub><mi>E</mi><mtext>in</mtext></msub><mo>/</mo><msub><mi>E</mi><mtext>sat</mtext></msub></math> decides how low the trailing edge's gain falls. Both appear in the amplifier panel, and the sweep charts show the whole curve.</p>
   <h3>Backwards: the input that produces a wanted output</h3>
   <p>The fluence relation is monotonic, so it inverts in closed form. Given the wanted output you get the required input directly, with no iteration:</p>
   <div class="eq"><math display="block"><mrow>
@@ -369,41 +463,67 @@ footer.foot { max-width: 76ch; margin: 36px auto 0; font-size: 0.85rem; color: v
   </mrow></math></div>
   <p>This is the pre-compensation used in shaped-seed fibre MOPAs [5, 6]: a square output needs a seed that ramps up towards its trailing edge to make up for the gain the front of the pulse has already consumed. The required input always exists; whether it is practical is another matter, and the warnings flag outputs that exceed the stored energy.</p>
   <h3>Energies, not fluences</h3>
-  <p>For a single transverse mode the fluence is replaced by energy through the effective area, <math><msub><mi>E</mi><mtext>sat</mtext></msub><mo>=</mo><msub><mi>J</mi><mtext>sat</mtext></msub><msub><mi>A</mi><mtext>eff</mtext></msub></math> with <math><msub><mi>A</mi><mtext>eff</mtext></msub><mo>=</mo><mi>π</mi><msup><mi>d</mi><mn>2</mn></msup><mo>/</mo><mn>4</mn></math> for a Gaussian mode of 1/e² diameter d. The extractable stored energy and the extraction efficiency follow from the small-signal gain:</p>
+  <p>For a single transverse mode the fluence is replaced by energy through an effective area. In the “E<sub>sat</sub> &amp; gain” mode this is the plain beam area, <math><msub><mi>E</mi><mtext>sat</mtext></msub><mo>=</mo><msub><mi>J</mi><mtext>sat</mtext></msub><mi>π</mi><msup><mi>d</mi><mn>2</mn></msup><mo>/</mo><mn>4</mn></math> for a 1/e² diameter d. The extractable stored energy and the extraction efficiency follow from the small-signal gain:</p>
   <div class="eq"><math display="block"><mrow>
     <msub><mi>E</mi><mtext>stored</mtext></msub><mo>=</mo><msub><mi>E</mi><mtext>sat</mtext></msub><mo>⁢</mo><mi>ln</mi><msub><mi>G</mi><mn>0</mn></msub><mo>,</mo>
     <mspace width="1.6em"></mspace>
     <mi>η</mi><mo>=</mo><mfrac><mrow><msub><mi>E</mi><mtext>out</mtext></msub><mo>−</mo><msub><mi>E</mi><mtext>in</mtext></msub></mrow><msub><mi>E</mi><mtext>stored</mtext></msub></mfrac>
   </mrow></math></div>
-  <p>Treating the mode as a top-hat of area <math><msub><mi>A</mi><mtext>eff</mtext></msub></math> is the usual single-number approximation. A real Gaussian mode saturates its centre first, which softens the distortion slightly compared with the curves shown here.</p>
+  <h3>From a fibre datasheet to the model</h3>
+  <p>The “Fibre datasheet” mode follows the same derivation the Python package uses in <code>fiber.py</code>. The absorption figure fixes the dopant concentration, the geometry fixes the mode and its overlap with the doped core, and the inversion fixes the gain:</p>
+  <div class="eq"><math display="block"><mrow>
+    <mi>N</mi><mo>=</mo><mfrac><mrow><msub><mi>α</mi><mtext>ref</mtext></msub></mrow><mrow><mn>4.343</mn><mo>⁢</mo><msub><mi>Γ</mi><mtext>ref</mtext></msub><mo>⁢</mo><msub><mi>σ</mi><mi>a</mi></msub><mo>(</mo><msub><mi>λ</mi><mtext>ref</mtext></msub><mo>)</mo></mrow></mfrac><mo>,</mo>
+    <mspace width="1.4em"></mspace>
+    <mfrac><mi>w</mi><mi>a</mi></mfrac><mo>=</mo><mn>0.65</mn><mo>+</mo><mn>1.619</mn><msup><mi>V</mi><mrow><mo>−</mo><mn>3</mn><mo>/</mo><mn>2</mn></mrow></msup><mo>+</mo><mn>2.879</mn><msup><mi>V</mi><mrow><mo>−</mo><mn>6</mn></mrow></msup><mo>,</mo>
+    <mspace width="1.4em"></mspace>
+    <mi>Γ</mi><mo>=</mo><mn>1</mn><mo>−</mo><msup><mi>e</mi><mrow><mo>−</mo><mn>2</mn><msup><mi>a</mi><mn>2</mn></msup><mo>/</mo><msup><mi>w</mi><mn>2</mn></msup></mrow></msup>
+  </mrow></math></div>
+  <div class="eq"><math display="block"><mrow>
+    <msub><mi>E</mi><mtext>sat</mtext></msub><mo>=</mo><mfrac><mrow><mi>h</mi><mi>ν</mi><mo>⁢</mo><msub><mi>A</mi><mtext>core</mtext></msub></mrow><mrow><mi>Γ</mi><mo>(</mo><msub><mi>σ</mi><mi>a</mi></msub><mo>+</mo><msub><mi>σ</mi><mi>e</mi></msub><mo>)</mo></mrow></mfrac><mo>,</mo>
+    <mspace width="1.4em"></mspace>
+    <msub><mi>G</mi><mn>0</mn></msub><mo>=</mo><mi>exp</mi><mrow><mo>{</mo><mi>Γ</mi><mi>N</mi><mi>L</mi><mo>[</mo><mo>(</mo><msub><mi>σ</mi><mi>a</mi></msub><mo>+</mo><msub><mi>σ</mi><mi>e</mi></msub><mo>)</mo><msub><mi>n</mi><mn>2</mn></msub><mo>−</mo><msub><mi>σ</mi><mi>a</mi></msub><mo>]</mo><mo>}</mo></mrow><mo>,</mo>
+    <mspace width="1.4em"></mspace>
+    <msub><mi>E</mi><mtext>stored</mtext></msub><mo>=</mo><mi>h</mi><mi>ν</mi><mo>⁢</mo><mi>N</mi><msub><mi>A</mi><mtext>core</mtext></msub><mi>L</mi><mo>(</mo><msub><mi>n</mi><mn>2</mn></msub><mo>−</mo><msub><mi>n</mi><mtext>tr</mtext></msub><mo>)</mo>
+  </mrow></math></div>
+  <p>Here a is the core radius, V = 2πa·NA/λ, w the LP01 mode-field radius from Marcuse's fit, Γ the overlap of the mode with the doped core, and <math><msub><mi>n</mi><mtext>tr</mtext></msub><mo>=</mo><msub><mi>σ</mi><mi>a</mi></msub><mo>/</mo><mo>(</mo><msub><mi>σ</mi><mi>a</mi></msub><mo>+</mo><msub><mi>σ</mi><mi>e</mi></msub><mo>)</mo></math> the transparency inversion. A core-absorption figure uses Γ at λ<sub>ref</sub>; a cladding figure (the pump absorption of a double-clad fibre) uses Γ = A<sub>core</sub>/A<sub>clad</sub>. When the datasheet gives the mode-field diameter instead of the NA, the fit is inverted to get the V-number and the overlap at other wavelengths follows from it. The saturation energy with A<sub>core</sub>/Γ is the Giles-model form, about half the π w² area for a small core: it reproduces the onset of saturation set by the peak intensity of the mode. The cross sections come from the tables shipped with this repository (representative values, not vendor data), interpolated at the signal, reference and pump wavelengths.</p>
+  <h3>Pump estimate</h3>
+  <p>With “gain from pump estimate” the pre-pulse inversion is not entered but solved from an energy balance between pulses. The fibre is treated as one lumped reservoir of <math><msub><mi>N</mi><mtext>tot</mtext></msub><mo>=</mo><mi>N</mi><msub><mi>A</mi><mtext>core</mtext></msub><mi>L</mi></math> ions. Each pulse removes one ion from the upper state per photon it gains; between pulses the pump refills it and the lifetime drains it:</p>
+  <div class="eq"><math display="block"><mrow>
+    <mfrac><mrow><mi>d</mi><msub><mi>n</mi><mn>2</mn></msub></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mfrac><mrow><msub><mi>P</mi><mtext>abs</mtext></msub><mo>(</mo><msub><mi>n</mi><mn>2</mn></msub><mo>)</mo></mrow><mrow><mi>h</mi><msub><mi>ν</mi><mi>p</mi></msub><msub><mi>N</mi><mtext>tot</mtext></msub></mrow></mfrac><mo>−</mo><mfrac><msub><mi>n</mi><mn>2</mn></msub><mi>τ</mi></mfrac><mo>,</mo>
+    <mspace width="1.4em"></mspace>
+    <msub><mi>P</mi><mtext>abs</mtext></msub><mo>=</mo><msub><mi>P</mi><mi>p</mi></msub><mrow><mo>[</mo><mn>1</mn><mo>−</mo><mi>exp</mi><mo>(</mo><mo>−</mo><msub><mi>Γ</mi><mi>p</mi></msub><mi>N</mi><mi>L</mi><mo>[</mo><msubsup><mi>σ</mi><mi>a</mi><mi>p</mi></msubsup><mo>(</mo><mn>1</mn><mo>−</mo><msub><mi>n</mi><mn>2</mn></msub><mo>)</mo><mo>−</mo><msubsup><mi>σ</mi><mi>e</mi><mi>p</mi></msubsup><msub><mi>n</mi><mn>2</mn></msub><mo>]</mo><mo>)</mo><mo>]</mo></mrow>
+  </mrow></math></div>
+  <p>The periodic steady state (pulse, recovery over one period, same inversion again) is found by bisection on the pre-pulse inversion, integrating the recovery with an adaptive Runge–Kutta step. Two caps apply: the pump cannot invert the medium beyond <math><msubsup><mi>σ</mi><mi>a</mi><mi>p</mi></msubsup><mo>/</mo><mo>(</mo><msubsup><mi>σ</mi><mi>a</mi><mi>p</mi></msubsup><mo>+</mo><msubsup><mi>σ</mi><mi>e</mi><mi>p</mi></msubsup><mo>)</mo></math> (0.5 for Yb pumped at 976 nm, close to 1 for Er at 976 nm), and the “ASE gain cap” clamps the inversion so the single-pass gain never exceeds it, standing in for the ASE that would otherwise drain a long, highly doped fibre at a low repetition rate. This is a design estimate: it has no position dependence along the fibre, no ASE spectrum, no excited-state absorption, upconversion or ion pairing, and the pump is continuous. For those, use the full solver in the Python package.</p>
   <h3>Numerics</h3>
   <ul>
     <li>Each shape is defined with unit width and calibrated numerically once (FWHM, peak position and the support where it exceeds 10⁻⁶ of the peak), then scaled to the requested FWHM. The grid has 4096 samples over that support with 4 % padding, so the Q-switch tail and the custom table are resolved on the same footing as the analytic shapes. Shapes follow the definitions in the Python package: Gaussian exp[−4 ln2 (t/T)²], super-Gaussian exp[−ln2 (2|t|/T)<sup>2m</sup>], sech²(1.7627 t/T), a square with logistic edges whose 10–90 % time is set as a fraction of the FWHM, and the asymmetric Q-switch shape 1/[exp(−t/τ<sub>r</sub>) + exp(t/τ<sub>f</sub>)]² with the fall/rise ratio as the free parameter.</li>
-    <li>The cumulative energy is accumulated sample by sample and the closed form is evaluated at the midpoint of every sample. No differential equation is integrated, so the result has no step-size error beyond the sampling of the pulse itself. Total energies use the exact fluence relation.</li>
+    <li>The cumulative energy is accumulated sample by sample and the closed form is evaluated at the midpoint of every sample. No differential equation is integrated for the pulse itself, so the result has no step-size error beyond the sampling of the pulse. Total energies use the exact fluence relation.</li>
     <li>The forms <code>log1p(G₀·expm1(u))</code> and <code>1/(1 − e<sup>−u</sup>(1 − 1/G₀))</code> keep full precision for weak saturation (u ≪ 1) and for gains of 60 dB; for u above 30 the asymptotic expansion u + ln G₀ + log1p[(1/G₀ − 1)e<sup>−u</sup>] is used so nothing overflows. The same equations hold for G₀ below unity, where the medium is a saturable absorber.</li>
-    <li>The z-slices evaluate the same closed form with G₀ replaced by G₀<sup>z/L</sup>, which assumes the small-signal gain per unit length is uniform. The energy sweep repeats the forward (or inverse) calculation for 90 energies spaced logarithmically from 10⁻³ to 30 E<sub>sat</sub>, extended to include the current operating point.</li>
+    <li>The z-slices evaluate the same closed form with G₀ replaced by G₀<sup>z/L</sup>, which assumes the small-signal gain per unit length is uniform. The energy sweep repeats the forward (or inverse) calculation for 90 energies spaced logarithmically from 10⁻³ to 30 E<sub>sat</sub>, extended to include the current operating point; in pump-estimate mode the inversion is held at the solved value during the sweep.</li>
     <li>FWHM is measured by linear interpolation of the half-maximum crossings on each side of the global maximum; rise and fall are the 10–90 % crossings on either side of the peak.</li>
   </ul>
   <h3>What it does not include</h3>
   <ul>
-    <li>Pumping and decay during the pulse. The model needs the pulse to be much shorter than the upper-state lifetime (about 10 ms for Er, 1 ms for Yb in silica, 230 µs for Nd:YAG, 3.2 µs for Ti:sapphire); the presets carry these lifetimes and a warning appears when the pulse is longer than a tenth of it.</li>
+    <li>Pumping and decay during the pulse. The model needs the pulse to be much shorter than the upper-state lifetime (about 10 ms for Er, 1 ms for Yb in silica, 230 µs for Nd:YAG, 3.2 µs for Ti:sapphire); a warning appears when the pulse is longer than a tenth of it.</li>
     <li>Coherent effects, finite gain bandwidth and dispersion, which matter below a picosecond or so.</li>
-    <li>Fibre nonlinearities (self-phase modulation, Raman, Brillouin), amplified spontaneous emission, excited-state absorption, ion pairing and the radial inversion profile. The Python package in this repository (<code>pulse.fn_deplete</code> and <code>pulse.propagate_pulse</code>) generalises the Frantz–Nodvik pass to rings, modes and paired ions and adds those effects.</li>
+    <li>Fibre nonlinearities (self-phase modulation, Raman, Brillouin), amplified spontaneous emission during the pulse, excited-state absorption, ion pairing and the radial inversion profile. The Python package in this repository (<code>pulse.fn_deplete</code> and <code>pulse.propagate_pulse</code>) generalises the Frantz–Nodvik pass to rings, modes and paired ions and adds those effects.</li>
   </ul>
 </section>
 
 <section class="prose refs" id="refs" aria-labelledby="h-refs">
   <h2 id="h-refs">References</h2>
   <ol>
-    <li><span class="id">[1]</span>L. M. Frantz and J. S. Nodvik, “Theory of pulse propagation in a laser amplifier,” <i>J. Appl. Phys.</i> <b>34</b>(8), 2346–2349 (1963). The original derivation for a two-level, four-level-like medium; the fluence formula above is their Eq. (22) written with the saturation fluence.</li>
+    <li><span class="id">[1]</span>L. M. Frantz and J. S. Nodvik, “Theory of pulse propagation in a laser amplifier,” <i>J. Appl. Phys.</i> <b>34</b>(8), 2346–2349 (1963). The original derivation; the fluence formula above is their result written with the saturation fluence.</li>
     <li><span class="id">[2]</span>W. H. Lowdermilk and J. E. Murray, “The multipass amplifier: theory and numerical analysis,” <i>J. Appl. Phys.</i> <b>51</b>(5), 2436–2444 (1980). Extends the model to lower-level population and multiple passes; the σ<sub>a</sub> + σ<sub>e</sub> saturation fluence used here is the three-level form of that extension.</li>
     <li><span class="id">[3]</span>A. E. Siegman, <i>Lasers</i> (University Science Books, 1986), Chapter 10, “Laser pulse amplification.” Textbook treatment, including pulse steepening and energy extraction limits.</li>
     <li><span class="id">[4]</span>W. Koechner, <i>Solid-State Laser Engineering</i>, 6th ed. (Springer, 2006), Chapter 4, “Laser amplifier.” Saturation fluences and the energy-extraction curves for Nd:YAG and other crystals used in the presets.</li>
     <li><span class="id">[5]</span>D. N. Schimpf, C. Ruchert, D. Nodop, J. Limpert, A. Tünnermann and F. Salin, “Compensation of pulse-distortion in saturated laser amplifiers,” <i>Opt. Express</i> <b>16</b>(22), 17637–17646 (2008), <a href="https://doi.org/10.1364/OE.16.017637" rel="noopener">doi:10.1364/OE.16.017637</a>. The analytic inverse used in the “output → required input” mode, verified on a fibre amplifier chain.</li>
     <li><span class="id">[6]</span>K. T. Vu, A. Malinowski, D. J. Richardson, F. Ghiringhelli, L. M. B. Hickey and M. N. Zervas, “Adaptive pulse shape control in a diode-seeded nanosecond fiber MOPA system,” <i>Opt. Express</i> <b>14</b>(23), 10996–11001 (2006), <a href="https://doi.org/10.1364/OE.14.010996" rel="noopener">doi:10.1364/OE.14.010996</a>. Pre-shaped seeds giving square output pulses from a saturated Yb fibre MOPA; A. Malinowski et al., <i>Opt. Express</i> <b>17</b>(23), 20927 (2009) does the same with an electro-optic modulator.</li>
-    <li><span class="id">[7]</span>R. Paschotta, <i>RP Photonics Encyclopedia</i>, articles “Gain saturation” and “Saturation energy,” <a href="https://www.rp-photonics.com/gain_saturation.html" rel="noopener">rp-photonics.com/gain_saturation.html</a>. Accessible summary of saturation energy and the Frantz–Nodvik result.</li>
+    <li><span class="id">[7]</span>C. R. Giles and E. Desurvire, “Modeling erbium-doped fiber amplifiers,” <i>J. Lightwave Technol.</i> <b>9</b>(2), 271–283 (1991). The overlap-factor description of a doped fibre (concentration from absorption, Γ, saturation with A<sub>core</sub>/Γ) that the datasheet mode uses.</li>
+    <li><span class="id">[8]</span>D. Marcuse, “Loss analysis of single-mode fiber splices,” <i>Bell Syst. Tech. J.</i> <b>56</b>(5), 703–718 (1977). The LP01 mode-field radius fit w/a = 0.65 + 1.619 V<sup>−3/2</sup> + 2.879 V<sup>−6</sup>.</li>
+    <li><span class="id">[9]</span>R. Paschotta, <i>RP Photonics Encyclopedia</i>, articles “Gain saturation” and “Saturation energy,” <a href="https://www.rp-photonics.com/gain_saturation.html" rel="noopener">rp-photonics.com/gain_saturation.html</a>. Accessible summary of saturation energy and the Frantz–Nodvik result.</li>
   </ol>
-  <p>Cross sections in the presets are representative literature-class values (the Er and Yb ones are taken from the data tables shipped with this repository, which are not vendor data); replace them with measured spectra for quantitative design.</p>
+  <p>Cross sections are representative literature-class values from the data tables shipped with this repository, which are not vendor data; replace them with measured spectra for quantitative design.</p>
 </section>
 <footer class="foot">Part of the ErrAmpSim repository. Single file, no external code; the Google Fonts request only changes the typeface.</footer>
 </div>
@@ -412,7 +532,7 @@ footer.foot { max-width: 76ch; margin: 36px auto 0; font-size: 0.85rem; color: v
 /* Frantz–Nodvik core: pure functions, no DOM. Units: SI throughout (s, J, W, m, m²). */
 const FN = (() => {
   'use strict';
-  const H = 6.62607015e-34, C0 = 2.99792458e8;
+  const H = 6.62607015e-34, C0 = 2.99792458e8, DBNP = 10 / Math.LN10;   // dB per neper
 
   /* --- closed-form primitives; u, v are fluences in units of the saturation fluence, G0 is linear --- */
   function joutNorm(u, G0) {                     // J_out / J_sat given J_in / J_sat
@@ -451,7 +571,7 @@ const FN = (() => {
 
   /* --- pulse metrics --- */
   function argmax(P) { let m = -Infinity, i = 0; for (let k = 0; k < P.length; k++) if (P[k] > m) { m = P[k]; i = k; } return i; }
-  function crossing(t, P, level, i, j) {         // half-max style crossing between sample i (inside) and j (outside)
+  function crossing(t, P, level, i, j) {         // crossing between sample i (inside) and j (outside)
     if (j < 0 || j >= P.length || P[i] === P[j]) return t[i];
     return t[j] + (level - P[j]) * (t[i] - t[j]) / (P[i] - P[j]);
   }
@@ -537,11 +657,58 @@ const FN = (() => {
     if (!(Math.max(...P) > 0)) return { error: 'All samples are zero or negative.' };
     return { t: Float64Array.from(t), P: Float64Array.from(P) };
   }
-  function esatFrom(lam_m, sa_m2, se_m2, d_m) {
+
+  /* --- fibre geometry (LP01, Marcuse) and the lumped pump balance --- */
+  function marcuse(V) { V = Math.max(V, 0.8); return 0.65 + 1.619 * Math.pow(V, -1.5) + 2.879 * Math.pow(V, -6); }
+  function invertMarcuse(wa) {                   // V for a given w/a (monotone decreasing fit); null outside the fit
+    if (wa >= marcuse(0.8)) return 0.8;
+    if (wa <= marcuse(40)) return null;
+    let lo = 0.8, hi = 40;
+    for (let i = 0; i < 60; i++) { const m = 0.5 * (lo + hi); if (marcuse(m) > wa) lo = m; else hi = m; }
+    return 0.5 * (lo + hi);
+  }
+  function esatBulk(lam_m, sa_m2, se_m2, d_m) {
     const Jsat = H * C0 / lam_m / (sa_m2 + se_m2), Aeff = Math.PI * d_m * d_m / 4;
     return { Jsat, Aeff, Esat: Jsat * Aeff };
   }
-  return { H, C0, joutNorm, jinNorm, gainAt, invGainAt, forward, inverse, fwhm, stats, argmax, calibrate, buildPulse, parseCustom, esatFrom };
+  /* periodic steady state of the pre-pulse inversion; pulseFn(G0) -> {Ein, Eout} */
+  function pumpSteadyState(f, pulseFn) {
+    const Ntot = Math.max(f.N * f.Acore * f.L, 1), T = 1 / f.frep;
+    const nPmax = f.saP + f.seP > 0 ? f.saP / (f.saP + f.seP) : 1;
+    const nHi = Math.max(0, Math.min(1, nPmax, f.nCap));
+    const rate = n => {
+      const ap = f.GamP * f.N * (f.saP * (1 - n) - f.seP * n);
+      const Pabs = ap > 0 ? f.Pp * (1 - Math.exp(-ap * f.L)) : 0;
+      return Pabs / (f.hnuP * Ntot) - n / f.tau;
+    };
+    function recover(n0) {
+      let n = Math.max(0, Math.min(1, n0)), t = 0, guard = 0;
+      while (t < T && guard++ < 400000) {
+        const f0 = rate(n);
+        if (Math.abs(f0) * (T - t) < 1e-7) break;                       // already at the steady state
+        const f1 = rate(Math.min(1, n + 1e-4)), k = Math.abs((f1 - f0) / 1e-4) + 1 / f.tau;
+        const h = Math.min(T - t, 0.2 / k, T / 50);
+        const k1 = f0, k2 = rate(n + 0.5 * h * k1), k3 = rate(n + 0.5 * h * k2), k4 = rate(n + h * k3);
+        n = Math.max(0, Math.min(1, n + h * (k1 + 2 * k2 + 2 * k3 + k4) / 6)); t += h;
+      }
+      return Math.min(n, nHi);
+    }
+    const cycle = nPre => {
+      const r = pulseFn(Math.pow(10, f.gainDbAt(nPre) / 10));
+      return recover(nPre - (r.Eout - r.Ein) / (f.hnuS * Ntot));
+    };
+    let n2;
+    if (cycle(nHi) >= nHi - 1e-9) n2 = nHi;
+    else {
+      let lo = 0, hi = nHi;
+      for (let i = 0; i < 40; i++) { const m = 0.5 * (lo + hi); if (cycle(m) > m) lo = m; else hi = m; }
+      n2 = 0.5 * (lo + hi);
+    }
+    const ap = f.GamP * f.N * (f.saP * (1 - n2) - f.seP * n2), Pabs = ap > 0 ? f.Pp * (1 - Math.exp(-ap * f.L)) : 0;
+    const limit = n2 >= f.nCap - 1e-4 ? 'ASE cap' : n2 >= nPmax - 1e-4 ? 'pump-wavelength limit' : 'pump / lifetime / extraction balance';
+    return { n2, Pabs, nPmax, limit, Ntot };
+  }
+  return { H, C0, DBNP, joutNorm, jinNorm, gainAt, invGainAt, forward, inverse, fwhm, stats, argmax, calibrate, buildPulse, parseCustom, marcuse, invertMarcuse, esatBulk, pumpSteadyState };
 })();
 </script>
 
@@ -549,11 +716,41 @@ const FN = (() => {
 (function () {
 'use strict';
 const $ = id => document.getElementById(id);
+const H = FN.H, C0 = FN.C0, DBNP = FN.DBNP;
 const TU = { ps: 1e-12, ns: 1e-9, us: 1e-6 }, TUL = { ps: 'ps', ns: 'ns', us: 'µs' };
 const EU = { nJ: 1e-9, uJ: 1e-6, mJ: 1e-3 }, EUL = { nJ: 'nJ', uJ: 'µJ', mJ: 'mJ' };
 const PU = { W: 1, kW: 1e3, MW: 1e6 };
 
-/* cross sections in 1e-25 m²; d in µm; tau is the upper-state lifetime in s */
+/* cross sections (λ nm, σa, σe in 1e-25 m²), subsampled from the repository's data tables */
+const XS = {
+  'er-al': { name: 'Er, aluminosilicate', d: [900,0,0,902,0,0,904,0,0,906,0,0,908,0,0,910,0,0,912,0,0,914,0,0,916,0,0,918,0,0,920,0,0,922,0,0,924,0,0,926,0,0,928,0,0,930,0,0,932,0,0,934,0,0,936,0,0,938,0,0,940,0.05,0,942,0.0675,0,944,0.0903,0,946,0.119,0,948,0.155,0,950,0.2,0,952,0.254,0,954,0.32,0,956,0.399,0,958,0.492,0,960,0.6,0,962,0.724,0,964,0.868,0,966,1.03,0,968,1.21,0,970,1.4,0,972,1.63,0,974,1.84,0,976,1.93,0,978,1.98,0,980,2,0,982,1.88,0,984,1.63,0,986,1.36,0,988,1.05,0,990,0.8,0,992,0.634,0,994,0.508,0,996,0.407,0,998,0.323,0,1000,0.25,0,1002,0.189,0,1004,0.139,0,1006,0.101,0,1008,0.0716,0,1010,0.05,0,1400,0,0,1402,0,0,1404,0,0,1406,0,0,1408,0,0,1410,0,0,1412,0,0,1414,0,0,1416,0,0,1418,0,0,1420,0,0,1422,0,0,1424,0,0,1426,0,0,1428,0,0,1430,0,0,1432,0,0,1434,0,0,1436,0,0,1438,0,0,1440,0.1,0.012,1442,0.123,0.0155,1444,0.149,0.0197,1446,0.181,0.025,1448,0.218,0.0316,1450,0.261,0.0396,1452,0.312,0.0494,1454,0.37,0.0614,1456,0.437,0.0758,1458,0.513,0.0932,1460,0.6,0.114,1462,0.698,0.139,1464,0.809,0.168,1466,0.93,0.202,1468,1.06,0.241,1470,1.2,0.285,1472,1.35,0.335,1474,1.51,0.391,1476,1.67,0.454,1478,1.84,0.522,1480,2,0.592,1482,2.15,0.666,1484,2.3,0.743,1486,2.44,0.824,1488,2.58,0.908,1490,2.7,0.994,1492,2.81,1.08,1494,2.91,1.17,1496,3.01,1.26,1498,3.1,1.36,1500,3.2,1.46,1502,3.29,1.57,1504,3.38,1.68,1506,3.47,1.8,1508,3.58,1.93,1510,3.7,2.09,1512,3.85,2.27,1514,4.04,2.48,1516,4.25,2.72,1518,4.51,3,1520,4.8,3.34,1522,5.19,3.76,1524,5.67,4.28,1526,6.15,4.84,1528,6.71,5.5,1530,7,5.98,1532,6.82,6.07,1534,6.42,5.96,1536,5.91,5.71,1538,5.12,5.15,1540,4.4,4.61,1542,3.85,4.2,1544,3.39,3.85,1546,3.03,3.58,1548,2.74,3.37,1550,2.5,3.2,1552,2.3,3.06,1554,2.13,2.95,1556,1.97,2.85,1558,1.83,2.75,1560,1.7,2.65,1562,1.58,2.56,1564,1.46,2.47,1566,1.35,2.38,1568,1.25,2.28,1570,1.15,2.18,1572,1.05,2.08,1574,0.962,1.97,1576,0.876,1.87,1578,0.795,1.76,1580,0.72,1.66,1582,0.65,1.56,1584,0.584,1.45,1586,0.524,1.35,1588,0.469,1.26,1590,0.42,1.17,1592,0.376,1.09,1594,0.337,1.01,1596,0.302,0.942,1598,0.269,0.873,1600,0.24,0.808,1602,0.213,0.745,1604,0.189,0.684,1606,0.167,0.627,1608,0.147,0.575,1610,0.13,0.527,1612,0.115,0.484,1614,0.102,0.443,1616,0.0897,0.406,1618,0.0793,0.372,1620,0.07,0.341,1622,0.0618,0.313,1624,0.0547,0.287,1626,0.0483,0.263,1628,0.0427,0.241,1630,0.0378,0.221,1632,0.0333,0.202,1634,0.0294,0.185,1636,0.0259,0.169,1638,0.0228,0.154,1640,0.02,0.14,1642,0.0175,0.127,1644,0.0153,0.115,1646,0.0133,0.104,1648,0.0116,0.0937,1650,0.0101,0.0844,1652,0.00879,0.076,1654,0.00763,0.0684,1656,0.00663,0.0615,1658,0.00576,0.0553,1660,0.005,0.0497] },
+  'er-p': { name: 'Er, phosphosilicate', d: [900,0,0,902,0,0,904,0,0,906,0,0,908,0,0,910,0,0,912,0,0,914,0,0,916,0,0,918,0,0,920,0,0,922,0,0,924,0,0,926,0,0,928,0,0,930,0,0,932,0,0,934,0,0,936,0,0,938,0,0,940,0.05,0,942,0.0675,0,944,0.0903,0,946,0.119,0,948,0.155,0,950,0.2,0,952,0.254,0,954,0.32,0,956,0.399,0,958,0.492,0,960,0.6,0,962,0.724,0,964,0.868,0,966,1.03,0,968,1.21,0,970,1.4,0,972,1.63,0,974,1.84,0,976,1.93,0,978,1.98,0,980,2,0,982,1.88,0,984,1.63,0,986,1.36,0,988,1.05,0,990,0.8,0,992,0.634,0,994,0.508,0,996,0.407,0,998,0.323,0,1000,0.25,0,1002,0.189,0,1004,0.139,0,1006,0.101,0,1008,0.0716,0,1010,0.05,0,1400,0,0,1402,0,0,1404,0,0,1406,0,0,1408,0,0,1410,0,0,1412,0,0,1414,0,0,1416,0,0,1418,0,0,1420,0,0,1422,0,0,1424,0,0,1426,0,0,1428,0,0,1430,0,0,1432,0,0,1434,0,0,1436,0,0,1438,0,0,1440,0.05,0.00602,1442,0.0607,0.00766,1444,0.0735,0.0097,1446,0.0887,0.0123,1448,0.107,0.0154,1450,0.128,0.0194,1452,0.153,0.0242,1454,0.182,0.0302,1456,0.216,0.0374,1458,0.255,0.0463,1460,0.3,0.057,1462,0.353,0.0703,1464,0.418,0.0869,1466,0.494,0.107,1468,0.584,0.133,1470,0.686,0.163,1472,0.8,0.199,1474,0.923,0.24,1476,1.05,0.285,1478,1.18,0.335,1480,1.3,0.385,1482,1.41,0.436,1484,1.51,0.488,1486,1.61,0.543,1488,1.7,0.6,1490,1.8,0.663,1492,1.9,0.731,1494,2,0.803,1496,2.1,0.88,1498,2.2,0.962,1500,2.3,1.05,1502,2.4,1.14,1504,2.49,1.24,1506,2.58,1.34,1508,2.68,1.45,1510,2.8,1.58,1512,2.94,1.73,1514,3.11,1.91,1516,3.31,2.11,1518,3.53,2.36,1520,3.8,2.64,1522,4.14,3,1524,4.57,3.45,1526,5.05,3.98,1528,5.63,4.62,1530,6.2,5.3,1532,6.74,6,1534,6.97,6.46,1536,6.83,6.6,1538,6.05,6.08,1540,5,5.24,1542,4.25,4.63,1544,3.65,4.14,1546,3.18,3.76,1548,2.81,3.46,1550,2.5,3.2,1552,2.23,2.98,1554,2.01,2.78,1556,1.8,2.6,1558,1.61,2.42,1560,1.45,2.26,1562,1.3,2.12,1564,1.17,1.98,1566,1.05,1.85,1568,0.948,1.73,1570,0.85,1.61,1572,0.76,1.5,1574,0.678,1.39,1576,0.605,1.29,1578,0.539,1.19,1580,0.48,1.11,1582,0.428,1.02,1584,0.382,0.949,1586,0.34,0.879,1588,0.303,0.814,1590,0.27,0.753,1592,0.24,0.696,1594,0.214,0.644,1596,0.19,0.595,1598,0.169,0.548,1600,0.15,0.505,1602,0.133,0.464,1604,0.117,0.425,1606,0.103,0.389,1608,0.0909,0.355,1610,0.08,0.324,1612,0.0704,0.296,1614,0.0618,0.27,1616,0.0543,0.246,1618,0.0477,0.224,1620,0.042,0.205,1622,0.037,0.187,1624,0.0327,0.171,1626,0.0289,0.157,1628,0.0255,0.144,1630,0.0226,0.132,1632,0.0199,0.121,1634,0.0176,0.111,1636,0.0155,0.101,1638,0.0137,0.0922,1640,0.012,0.0839,1642,0.0105,0.0761,1644,0.00917,0.0688,1646,0.00798,0.0621,1648,0.00694,0.0559,1650,0.00603,0.0503,1652,0.00523,0.0453,1654,0.00455,0.0407,1656,0.00395,0.0366,1658,0.00344,0.033,1660,0.003,0.0298] },
+  'yb': { name: 'Yb, phosphosilicate', d: [850,0.1,0,852,0.116,0,854,0.133,0,856,0.154,0,858,0.177,0,860,0.203,0,862,0.234,0,864,0.268,0,866,0.307,0,868,0.35,0,870,0.4,0,872,0.456,0,874,0.519,0,876,0.59,0,878,0.67,0,880,0.759,0,882,0.86,0,884,0.973,0,886,1.1,0,888,1.24,0,890,1.4,0,892,1.58,0,894,1.78,0,896,2,0,898,2.24,0,900,2.5,0.04,902,2.79,0.0481,904,3.12,0.0576,906,3.48,0.0686,908,3.84,0.0813,910,4.2,0.0959,912,4.6,0.112,914,4.94,0.131,916,4.98,0.152,918,4.86,0.175,920,4.7,0.2,922,4.52,0.227,924,4.3,0.256,926,4.09,0.287,928,3.91,0.321,930,3.8,0.357,932,3.75,0.397,934,3.71,0.44,936,3.68,0.488,938,3.65,0.541,940,3.6,0.6,942,3.49,0.662,944,3.34,0.725,946,3.17,0.795,948,3.05,0.882,950,3,1,952,3.04,1.18,954,3.17,1.46,956,3.38,1.84,958,3.65,2.36,960,4,3,962,4.65,3.78,964,5.79,4.82,966,7.35,6.34,968,9.72,8.65,970,13,12,972,17.5,17.1,974,23.1,23.1,976,24,24.4,978,19.2,20.7,980,13,15,982,9.17,11.2,984,6.5,8.41,986,4.65,6.77,988,3.34,5.61,990,2.5,5,992,1.96,4.72,994,1.57,4.5,996,1.29,4.34,998,1.07,4.23,1000,0.9,4.2,1002,0.771,4.23,1004,0.67,4.33,1006,0.587,4.45,1008,0.515,4.58,1010,0.45,4.7,1012,0.39,4.81,1014,0.337,4.95,1016,0.291,5.07,1018,0.252,5.16,1020,0.22,5.2,1022,0.193,5.2,1024,0.171,5.2,1026,0.152,5.2,1028,0.135,5.2,1030,0.12,5.2,1032,0.107,5.15,1034,0.0957,5,1036,0.0858,4.81,1038,0.077,4.6,1040,0.0692,4.4,1042,0.0622,4.2,1044,0.0558,3.97,1046,0.0501,3.74,1048,0.0448,3.51,1050,0.04,3.3,1052,0.0356,3.1,1054,0.0315,2.92,1056,0.0278,2.74,1058,0.0246,2.56,1060,0.0217,2.4,1062,0.0191,2.24,1064,0.0169,2.1,1066,0.015,1.95,1068,0.0134,1.82,1070,0.012,1.7,1072,0.0108,1.59,1074,0.00978,1.48,1076,0.00887,1.38,1078,0.00806,1.29,1080,0.00734,1.2,1082,0.0067,1.12,1084,0.00612,1.04,1086,0.0056,0.974,1088,0.00512,0.909,1090,0.00469,0.848,1092,0.0043,0.792,1094,0.00393,0.739,1096,0.0036,0.689,1098,0.00329,0.643,1100,0.003,0.6,1102,0.00274,0.56,1104,0.00249,0.522,1106,0.00227,0.486,1108,0.00207,0.453,1110,0.00189,0.422,1112,0.00172,0.394,1114,0.00157,0.367,1116,0.00143,0.343,1118,0.00131,0.32,1120,0.00119,0.3,1122,0.00109,0.281,1124,0.000992,0.264,1126,0.000905,0.247,1128,0.000825,0.232,1130,0.000753,0.218,1132,0.000687,0.205,1134,0.000626,0.193,1136,0.000571,0.182,1138,0.000521,0.171,1140,0.000475,0.161,1142,0.000433,0.152,1144,0.000395,0.143,1146,0.000361,0.135,1148,0.000329,0.127,1150,0.0003,0.12] },
+};
+function xsAt(host, lam) {
+  const d = XS[host].d, n = d.length / 3;
+  if (lam <= d[0]) return { sa: d[1] * 1e-25, se: d[2] * 1e-25, ok: lam === d[0] };
+  if (lam >= d[(n - 1) * 3]) return { sa: d[(n - 1) * 3 + 1] * 1e-25, se: d[(n - 1) * 3 + 2] * 1e-25, ok: lam === d[(n - 1) * 3] };
+  let lo = 0, hi = n - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (d[m * 3] <= lam) lo = m; else hi = m; }
+  const gap = d[hi * 3] - d[lo * 3], w = (lam - d[lo * 3]) / gap;
+  return { sa: (d[lo * 3 + 1] + w * (d[hi * 3 + 1] - d[lo * 3 + 1])) * 1e-25, se: (d[lo * 3 + 2] + w * (d[hi * 3 + 2] - d[lo * 3 + 2])) * 1e-25, ok: gap <= 10 };
+}
+function xsRange(host) { const d = XS[host].d; return `${d[0]}–${d[d.length - 3]} nm` + (host.startsWith('er') ? ' (gap 1010–1400)' : ''); }
+
+/* fibre presets: datasheet-style figures (representative, not vendor data) */
+const FIBRES = [
+  { id: 'er-8-80', name: 'Er single-mode, 8 µm core, 80 dB/m @1530 (core)', dopant: 'er-al', absRef: 80, absKind: 'core', lamRef: 1530, coreD: 8, cladD: 125, modeKind: 'na', modeVal: 0.13, fibL: 2, lamS: 1550, pumpLam: 976, pumpGeom: 'core', tau2: 10, n2: 0.65 },
+  { id: 'er-4-30', name: 'Er single-mode, 4 µm core, 30 dB/m @1530 (core)', dopant: 'er-al', absRef: 30, absKind: 'core', lamRef: 1530, coreD: 4, cladD: 125, modeKind: 'na', modeVal: 0.2, fibL: 5, lamS: 1550, pumpLam: 976, pumpGeom: 'core', tau2: 10, n2: 0.65 },
+  { id: 'er-20-60dc', name: 'Er double-clad LMA, 20 µm core / 125 µm, 60 dB/m @1530 (core)', dopant: 'er-al', absRef: 60, absKind: 'core', lamRef: 1530, coreD: 20, cladD: 125, modeKind: 'na', modeVal: 0.08, fibL: 3, lamS: 1550, pumpLam: 976, pumpGeom: 'clad', tau2: 10, n2: 0.65 },
+  { id: 'yb-6-1200', name: 'Yb single-mode, 6 µm core, 1200 dB/m @976 (core)', dopant: 'yb', absRef: 1200, absKind: 'core', lamRef: 976, coreD: 6, cladD: 125, modeKind: 'na', modeVal: 0.12, fibL: 1.5, lamS: 1064, pumpLam: 976, pumpGeom: 'core', tau2: 0.85, n2: 0.25 },
+  { id: 'yb-10-125dc', name: 'Yb double-clad, 10 µm core / 125 µm, 4.8 dB/m @976 (cladding)', dopant: 'yb', absRef: 4.8, absKind: 'clad', lamRef: 976, coreD: 10, cladD: 125, modeKind: 'na', modeVal: 0.08, fibL: 4, lamS: 1064, pumpLam: 976, pumpGeom: 'clad', tau2: 0.85, n2: 0.25 },
+  { id: 'yb-20-400dc', name: 'Yb double-clad LMA, 20 µm core / 400 µm, 1.7 dB/m @976 (cladding)', dopant: 'yb', absRef: 1.7, absKind: 'clad', lamRef: 976, coreD: 20, cladD: 400, modeKind: 'na', modeVal: 0.06, fibL: 10, lamS: 1064, pumpLam: 976, pumpGeom: 'clad', tau2: 0.85, n2: 0.25 },
+  { id: 'custom', name: 'Custom fibre' },
+];
+const FIBRE_KEYS = ['dopant', 'absRef', 'absKind', 'lamRef', 'coreD', 'cladD', 'modeKind', 'modeVal', 'fibL', 'lamS', 'pumpLam', 'pumpGeom', 'tau2', 'n2'];
+
+/* bulk / simple presets: cross sections in 1e-25 m²; d in µm; tau is the upper-state lifetime in s */
 const PRESETS = [
   { id: 'er-sm', name: 'Er fibre, 1550 nm, single-mode (MFD 8 µm)', lam: 1550, sa: 2.5, se: 3.2, mfd: 8, tau: 10e-3 },
   { id: 'er-lma', name: 'Er fibre, 1550 nm, large-mode-area (MFD 20 µm)', lam: 1550, sa: 2.5, se: 3.2, mfd: 20, tau: 10e-3 },
@@ -566,13 +763,17 @@ const PRESETS = [
   { id: 'custom', name: 'Custom medium' },
 ];
 const DEFAULTS = {
-  mode: 'fwd', preset: 'er-sm', lam: 1550, sa: 2.5, se: 3.2, mfd: 8, esatDirectOn: false, esatDirect: 10, esatUnit: 'uJ', gainDb: 30,
+  mode: 'fwd', ampMode: 'fibre',
+  fibrePreset: 'er-8-80', dopant: 'er-al', absRef: 80, absKind: 'core', lamRef: 1530, coreD: 8, cladD: 125, modeKind: 'na', modeVal: 0.13, fibL: 2, bgLoss: 0, lamS: 1550,
+  gainFrom: 'inv', n2: 0.65, pumpP: 1, pumpLam: 976, pumpGeom: 'core', repRate: 10, tau2: 10, aseCap: 40,
+  preset: 'er-sm', lam: 1550, sa: 2.5, se: 3.2, mfd: 8, esatDirectOn: false, esatDirect: 10, esatUnit: 'uJ', gainDb: 30,
   shape: 'gauss', fwhm: 10, tUnit: 'ns', sgOrder: 3, edgePct: 5, fallRise: 3,
   customText: '0, 0\n1, 0.2\n2, 1\n3, 0.8\n4, 0.8\n5, 0.3\n6, 0.05\n7, 0', customScale: true,
-  specify: 'energy', energy: 0.1, eUnit: 'uJ', peak: 10, pUnit: 'W',
+  specify: 'energy', energy: 2, eUnit: 'uJ', peak: 10, pUnit: 'W',
   normalize: true, logy: false, evoNorm: true, slices: 11,
 };
-const STORE_KEY = 'frantz-nodvik-settings-v1';
+const RADIOS = { mode: ['fwd', 'inv'], ampMode: ['fibre', 'simple'], gainFrom: ['inv', 'pump'], specify: ['energy', 'peak'] };
+const STORE_KEY = 'frantz-nodvik-settings-v2';
 let S = { ...DEFAULTS };
 
 /* ---------- formatting ---------- */
@@ -605,30 +806,29 @@ function fmtE(J) {
 }
 const fmtT = s => sig(s / TU[S.tUnit]) + ' ' + TUL[S.tUnit];
 const dB = x => 10 * Math.log10(x);
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
 /* ---------- state <-> form ---------- */
 const FIELDS = Object.keys(DEFAULTS);
 function readForm() {
   const n = {};
   for (const k of FIELDS) {
-    if (k === 'mode') n.mode = $('mode-inv').checked ? 'inv' : 'fwd';
-    else if (k === 'specify') n.specify = $('specify-peak').checked ? 'peak' : 'energy';
-    else {
-      const el = $(k);
-      if (el.type === 'checkbox') n[k] = el.checked;
-      else if (el.type === 'number') { const v = parseFloat(el.value); n[k] = Number.isFinite(v) ? v : DEFAULTS[k]; }
-      else n[k] = el.value;
-    }
+    if (RADIOS[k]) { n[k] = RADIOS[k].find(v => $(k + '-' + v).checked) || DEFAULTS[k]; continue; }
+    const el = $(k);
+    if (el.type === 'checkbox') n[k] = el.checked;
+    else if (el.type === 'number') { const v = parseFloat(el.value); n[k] = Number.isFinite(v) ? v : DEFAULTS[k]; }
+    else n[k] = el.value;
   }
   S = n;
 }
 function writeForm() {
   for (const k of FIELDS) {
-    if (k === 'mode') { $('mode-fwd').checked = S.mode !== 'inv'; $('mode-inv').checked = S.mode === 'inv'; }
-    else if (k === 'specify') { $('specify-energy').checked = S.specify !== 'peak'; $('specify-peak').checked = S.specify === 'peak'; }
-    else { const el = $(k); if (el.type === 'checkbox') el.checked = !!S[k]; else el.value = S[k]; }
+    if (RADIOS[k]) { for (const v of RADIOS[k]) $(k + '-' + v).checked = S[k] === v; continue; }
+    const el = $(k);
+    if (el.type === 'checkbox') el.checked = !!S[k]; else el.value = S[k];
   }
   $('gainRange').value = Math.max(-10, Math.min(60, S.gainDb));
+  $('n2Range').value = Math.max(0, Math.min(1, S.n2));
 }
 function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { /* storage unavailable */ } }
 function load() {
@@ -692,7 +892,6 @@ function drawChart(cv, spec) {
   const sx = x => x0 + (lx(x) - lx(xlo)) / (lx(xhi) - lx(xlo)) * (x1 - x0);
   const sy = y => y1 - (ly(y) - ly(ylo)) / (ly(yhi) - ly(ylo)) * (y1 - y0);
   ctx.font = font; ctx.textBaseline = 'middle'; ctx.lineWidth = 1;
-  /* grid + ticks */
   const xt = logx ? logTicks(xlo, xhi) : linTicks(xlo, xhi, 6), yt = logy ? logTicks(ylo, yhi) : linTicks(ylo, yhi, 5);
   ctx.strokeStyle = grid;
   const xmaj = logx ? xt.major : xt.ticks, ymaj = logy ? yt.major : yt.ticks;
@@ -706,12 +905,10 @@ function drawChart(cv, spec) {
   ctx.textAlign = 'right';
   const yStep = logy ? 0 : yt.step;
   for (const v of ymaj) ctx.fillText(logy ? fmtLog(v) : fmtLin(v, yStep), x0 - 6, sy(v));
-  if (logy && yt.minor.length) { ctx.strokeStyle = grid; for (const v of yt.minor) { if (ymaj.length > 6) break; const py = Math.round(sy(v)) + 0.5; ctx.beginPath(); ctx.moveTo(x0, py); ctx.lineTo(x0 + 4, py); ctx.stroke(); } }
-  /* axis labels */
+  if (logy && yt.minor.length && ymaj.length <= 6) { ctx.strokeStyle = grid; for (const v of yt.minor) { const py = Math.round(sy(v)) + 0.5; ctx.beginPath(); ctx.moveTo(x0, py); ctx.lineTo(x0 + 4, py); ctx.stroke(); } }
   ctx.fillStyle = ink; ctx.textAlign = 'center'; ctx.font = small;
   if (spec.xlabel) ctx.fillText(spec.xlabel, (x0 + x1) / 2, Hc - 7);
   if (spec.ylabel) { ctx.save(); ctx.translate(12, (y0 + y1) / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(spec.ylabel, 0, 0); ctx.restore(); }
-  /* series */
   ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip();
   for (const s of spec.series) {
     ctx.strokeStyle = s.color; ctx.lineWidth = s.width || 2; ctx.setLineDash(s.dash || []); ctx.lineJoin = 'round';
@@ -735,9 +932,7 @@ function drawChart(cv, spec) {
     ctx.beginPath(); ctx.arc(sx(spec.marker.x), sy(spec.marker.y), 5, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
   }
   ctx.restore();
-  /* direct labels with a surface halo */
   if (spec.labels) { ctx.font = small; ctx.textAlign = 'left'; for (const L of spec.labels) { if (!Number.isFinite(L.y) || (logy && L.y <= 0)) continue; const px = Math.min(x1 - 40, Math.max(x0 + 2, sx(L.x) + (L.dx || 6))), py = Math.max(y0 + 8, sy(L.y) + (L.dy || -8)); ctx.lineWidth = 3; ctx.strokeStyle = surface; ctx.strokeText(L.text, px, py); ctx.fillStyle = ink; ctx.fillText(L.text, px, py); } }
-  /* legend */
   if (spec.legend && spec.legend.length) {
     ctx.font = small; ctx.textAlign = 'left';
     const rows = spec.legend, wmax = Math.max(...rows.map(r => ctx.measureText(r.label).width)) + 30, h = rows.length * 16 + 8;
@@ -746,13 +941,14 @@ function drawChart(cv, spec) {
     rows.forEach((r, i) => { const yy = lyp + 12 + i * 16; ctx.strokeStyle = r.color; ctx.lineWidth = 2; ctx.setLineDash(r.dash || []); ctx.beginPath(); ctx.moveTo(lxp + 7, yy); ctx.lineTo(lxp + 21, yy); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = fg; ctx.fillText(r.label, lxp + 26, yy); });
   }
   if (spec.gradient) {
-    const g = spec.gradient, gw = 90, gx = x1 - gw - 8, gy = y0 + 8;
+    const g = spec.gradient, gw = 90, gx = x1 - gw - 8 - ctx.measureText(g.l1).width, gy = y0 + 8;
+    ctx.font = small;
+    const w0 = ctx.measureText(g.l0).width, w1 = ctx.measureText(g.l1).width;
     const grd = ctx.createLinearGradient(gx, 0, gx + gw, 0); grd.addColorStop(0, g.c0); grd.addColorStop(1, g.c1);
-    ctx.fillStyle = surface; ctx.globalAlpha = 0.85; ctx.fillRect(gx - 34, gy - 6, gw + 70, 22); ctx.globalAlpha = 1;
+    ctx.fillStyle = surface; ctx.globalAlpha = 0.85; ctx.fillRect(gx - w0 - 10, gy - 6, gw + w0 + w1 + 20, 22); ctx.globalAlpha = 1;
     ctx.fillStyle = grd; ctx.fillRect(gx, gy, gw, 8);
-    ctx.font = small; ctx.fillStyle = fg; ctx.textAlign = 'right'; ctx.fillText(g.l0, gx - 4, gy + 4); ctx.textAlign = 'left'; ctx.fillText(g.l1, gx + gw + 4, gy + 4);
+    ctx.fillStyle = fg; ctx.textAlign = 'right'; ctx.fillText(g.l0, gx - 4, gy + 4); ctx.textAlign = 'left'; ctx.fillText(g.l1, gx + gw + 4, gy + 4);
   }
-  /* readout box */
   if (spec.hover && spec.hover.lines) {
     ctx.font = small; ctx.textAlign = 'left';
     const lines = spec.hover.lines, bw = Math.max(...lines.map(l => ctx.measureText(l).width)) + 16, bh = lines.length * 15 + 10;
@@ -770,6 +966,88 @@ function pxToX(cv, px) {
   return s.logx ? Math.pow(10, Math.log10(s.xlo) + f * (Math.log10(s.xhi) - Math.log10(s.xlo))) : s.xlo + f * (s.xhi - s.xlo);
 }
 
+/* ---------- amplifier models ---------- */
+function simpleModel() {
+  const preset = PRESETS.find(p => p.id === S.preset), warn = [];
+  const lam = Math.max(100, S.lam) * 1e-9, sa = Math.max(0, S.sa) * 1e-25, se = Math.max(0, S.se) * 1e-25, d = Math.max(1e-7, S.mfd) * 1e-6;
+  const med = FN.esatBulk(lam, sa, Math.max(se, sa > 0 ? 0 : 1e-30), d);
+  const Esat = S.esatDirectOn ? Math.max(1e-15, S.esatDirect * EU[S.esatUnit]) : Math.max(1e-15, med.Esat);
+  const gainDb = S.gainDb, lnG0 = gainDb / DBNP;
+  const info = [
+    ['Photon energy hν', `${sig(H * C0 / lam / 1.602176634e-19)} eV`],
+    ['Saturation fluence J<sub>sat</sub>', S.esatDirectOn ? '—' : `${sig(med.Jsat / 1e4)} J/cm²`],
+    ['Effective area A<sub>eff</sub>', `${sig(med.Aeff * 1e12)} µm²`],
+    ['Saturation energy E<sub>sat</sub>', fmtE(Esat)],
+    ['Small-signal gain G<sub>0</sub>', `${sig(gainDb, 3)} dB (${sig(Math.pow(10, gainDb / 10), 4)}×)`],
+    ['Extractable stored energy', fmtE(Esat * lnG0)],
+    ['Upper-state lifetime (preset)', preset && preset.tau ? `${sig(preset.tau * 1e3)} ms` : 'n/a'],
+  ];
+  return { Esat, gainDb, info, warn, tau: preset && preset.tau ? preset.tau : null, L: null };
+}
+function fibreModel(makePulseFn) {
+  const warn = [], lamS = Math.max(100, S.lamS), a = Math.max(0.25, S.coreD) * 1e-6 / 2, Acore = Math.PI * a * a;
+  const dClad = Math.max(S.cladD, S.coreD, 1) * 1e-6, Aclad = Math.PI * dClad * dClad / 4, L = Math.max(1e-3, S.fibL);
+  let NA, modeNote = '';
+  if (S.modeKind === 'mfd') {
+    const wa = Math.max(0.05, S.modeVal) * 1e-6 / 2 / a, V = FN.invertMarcuse(wa);
+    if (V === null) { NA = 20 * lamS * 1e-9 / (2 * Math.PI * a); warn.push(['warn', 'The given MFD is smaller than any LP01 mode of this core; the mode is taken as tightly confined (w/a = 0.67).']); }
+    else NA = V * lamS * 1e-9 / (2 * Math.PI * a);
+    modeNote = ' (from MFD)';
+  } else NA = Math.max(0.01, S.modeVal);
+  const Vof = lam => 2 * Math.PI * a * NA / (lam * 1e-9);
+  const wOf = lam => a * FN.marcuse(Vof(lam));
+  const gamOf = lam => 1 - Math.exp(-2 * a * a / (wOf(lam) * wOf(lam)));
+  const host = XS[S.dopant] ? S.dopant : 'er-al';
+  const xsS = xsAt(host, lamS), xsR = xsAt(host, S.lamRef), xsP = xsAt(host, S.pumpLam);
+  if (!xsS.ok) warn.push(['crit', `Signal wavelength ${sig(lamS, 4)} nm is outside the ${XS[host].name} table (${xsRange(host)}); edge values are used.`]);
+  if (!xsR.ok) warn.push(['crit', `λ_ref = ${sig(S.lamRef, 4)} nm is outside the ${XS[host].name} table (${xsRange(host)}); the concentration is unreliable.`]);
+  if (!(xsR.sa > 0)) warn.push(['crit', `No absorption in the table at λ_ref = ${sig(S.lamRef, 4)} nm, so the concentration cannot be derived. Use 1530 nm for Er or 976 nm for Yb.`]);
+  const GamRef = S.absKind === 'clad' ? Acore / Aclad : gamOf(S.lamRef);
+  const N = Math.max(0, S.absRef) / DBNP / (GamRef * Math.max(xsR.sa, 1e-30));
+  const GamS = gamOf(lamS), V = Vof(lamS), mfd = 2 * wOf(lamS), hnuS = H * C0 / (lamS * 1e-9), saS = xsS.sa, seS = xsS.se;
+  const Esat = Math.max(1e-15, hnuS * Acore / (GamS * Math.max(saS + seS, 1e-30)));
+  const bg = Math.max(0, S.bgLoss) * L;
+  const gainDbAt = n => DBNP * GamS * N * L * ((saS + seS) * n - saS) - bg;
+  const nAtGain = g => ((g + bg) / Math.max(DBNP * GamS * N * L, 1e-30) + saS) / Math.max(saS + seS, 1e-30);
+  const ntr = saS / Math.max(saS + seS, 1e-30);
+  if (V > 2.405) warn.push(['info', `The core is multimode at the signal (V = ${sig(V)}); the LP01 mode is assumed (MFD ${sig(mfd * 1e6)} µm, Γ = ${sig(GamS)}).`]);
+  let n2, pump = null;
+  if (S.gainFrom === 'pump') {
+    const GamP = S.pumpGeom === 'clad' ? Acore / Aclad : gamOf(S.pumpLam);
+    if (!xsP.ok) warn.push(['crit', `Pump wavelength ${sig(S.pumpLam, 4)} nm is outside the ${XS[host].name} table (${xsRange(host)}).`]);
+    const f = { N, Acore, L, GamP, saP: xsP.sa, seP: xsP.se, hnuP: H * C0 / (S.pumpLam * 1e-9), hnuS, Pp: Math.max(0, S.pumpP), frep: Math.max(1e-3, S.repRate) * 1e3, tau: Math.max(1e-6, S.tau2) * 1e-3, nCap: nAtGain(Math.max(0, S.aseCap)), gainDbAt };
+    pump = N > 0 ? FN.pumpSteadyState(f, makePulseFn(Esat)) : { n2: 0, Pabs: 0, nPmax: 1, limit: 'no dopant', Ntot: 0 };
+    pump.GamP = GamP; pump.f = f;
+    n2 = pump.n2;
+  } else n2 = Math.max(0, Math.min(1, S.n2));
+  const gainDb = gainDbAt(n2), gFull = gainDbAt(1);
+  if (S.gainFrom !== 'pump' && gainDb > 40) warn.push(['warn', `A single-pass gain of ${sig(gainDb, 3)} dB is above what ASE allows in practice (about 35–45 dB); the inversion would be clamped lower.`]);
+  if (n2 < ntr) warn.push(['info', `n₂ = ${sig(n2)} is below the transparency inversion ${sig(ntr)} at ${sig(lamS, 4)} nm: the fibre absorbs the signal.`]);
+  const Estored = hnuS * N * Acore * L * (n2 - ntr);
+  const info = [
+    ['Dopant concentration N', `${sig(N / 1e25)} ×10²⁵ m⁻³`],
+    ['V-number at the signal' + modeNote, `${sig(V)}${V > 2.405 ? ' (multimode)' : ''}`],
+    ['LP01 mode-field diameter', `${sig(mfd * 1e6)} µm`],
+    ['Overlap Γ with the core', sig(GamS)],
+    ['σ<sub>a</sub> / σ<sub>e</sub> at the signal', `${sig(saS / 1e-25)} / ${sig(seS / 1e-25)} ×10⁻²⁵ m²`],
+    ['Transparency inversion n<sub>tr</sub>', sig(ntr)],
+    ['Saturation fluence J<sub>sat</sub>', `${sig(hnuS / (saS + seS) / 1e4)} J/cm²`],
+    ['Saturation energy E<sub>sat</sub>', fmtE(Esat)],
+    ['Gain at full inversion (n<sub>2</sub> = 1)', `${sig(gFull, 3)} dB`],
+    ['Pre-pulse inversion n<sub>2</sub>' + (pump ? ' (estimate)' : ''), sig(n2)],
+    ['Small-signal gain G<sub>0</sub>', `${sig(gainDb, 3)} dB (${sig(Math.pow(10, gainDb / 10), 4)}×)`],
+    ['Extractable stored energy', fmtE(Estored)],
+  ];
+  if (pump) {
+    info.push(['sep']);
+    info.push(['Limited by', pump.limit]);
+    info.push(['Pump absorbed, pre-pulse', `${sig(pump.Pabs)} / ${sig(pump.f.Pp)} W`]);
+    info.push(['Pump overlap Γ<sub>p</sub>', sig(pump.GamP)]);
+    info.push(['Max inversion from this pump', sig(pump.nPmax)]);
+  }
+  return { Esat, gainDb, info, warn, tau: Math.max(1e-6, S.tau2) * 1e-3, L, pump, N, Acore, hnuS };
+}
+
 /* ---------- model evaluation ---------- */
 const calCache = new Map();
 function getCal(kind, p) {
@@ -777,15 +1055,9 @@ function getCal(kind, p) {
   if (!calCache.has(key)) { if (calCache.size > 40) calCache.clear(); calCache.set(key, FN.calibrate(kind, p)); }
   return calCache.get(key);
 }
-let R = null;                                    // last results
+let R = null;
 function compute() {
-  const preset = PRESETS.find(p => p.id === S.preset);
-  const lam = S.lam * 1e-9, sa = Math.max(0, S.sa) * 1e-25, se = Math.max(0, S.se) * 1e-25, d = Math.max(1e-7, S.mfd) * 1e-6;
-  const med = FN.esatFrom(lam, sa, Math.max(se, sa > 0 ? 0 : 1e-30), d);
-  const Esat = S.esatDirectOn ? Math.max(1e-15, S.esatDirect * EU[S.esatUnit]) : Math.max(1e-15, med.Esat);
-  const G0 = Math.pow(10, S.gainDb / 10), lnG0 = Math.log(G0);
-  const Estored = Esat * lnG0;
-  /* shape */
+  /* pulse shape first: the pump estimate needs it */
   let kind = S.shape, customErr = '';
   const p = { sgOrder: S.sgOrder, edgePct: S.edgePct, fallRise: S.fallRise };
   if (kind === 'custom') {
@@ -794,23 +1066,28 @@ function compute() {
   }
   const cal = getCal(kind, p);
   let T = Math.max(1e-15, S.fwhm) * TU[S.tUnit];
-  if (kind === 'custom' && !S.customScale) T = cal.fwhm * TU[S.tUnit];          // keep the table's own time axis
+  if (kind === 'custom' && !S.customScale) T = cal.fwhm * TU[S.tUnit];
   const pulse = FN.buildPulse(cal, T), N = pulse.t.length, dt = pulse.dt;
   let Eunit = 0; for (let i = 0; i < N; i++) Eunit += pulse.s[i]; Eunit *= dt;
   const scale = S.specify === 'peak' ? Math.max(0, S.peak) * PU[S.pUnit] : Math.max(0, S.energy) * EU[S.eUnit] / Eunit;
   const Pspec = new Float64Array(N); for (let i = 0; i < N; i++) Pspec[i] = pulse.s[i] * scale;
+  const inv = S.mode === 'inv';
+  const makePulseFn = Esat => G0 => inv ? FN.inverse(Pspec, dt, Esat, G0) : FN.forward(Pspec, dt, Esat, G0);
+  /* amplifier */
+  const amp = S.ampMode === 'fibre' ? fibreModel(makePulseFn) : simpleModel();
+  const Esat = amp.Esat, gainDb = amp.gainDb, G0 = Math.pow(10, gainDb / 10), lnG0 = gainDb / DBNP, Estored = Esat * lnG0;
+  /* Frantz–Nodvik */
   let Pin, Pout, G, Ein, Eout;
-  if (S.mode === 'inv') { const r = FN.inverse(Pspec, dt, Esat, G0); Pin = r.Pin; Pout = Pspec; G = r.G; Ein = r.Ein; Eout = r.Eout; }
+  if (inv) { const r = FN.inverse(Pspec, dt, Esat, G0); Pin = r.Pin; Pout = Pspec; G = r.G; Ein = r.Ein; Eout = r.Eout; }
   else { const r = FN.forward(Pspec, dt, Esat, G0); Pin = Pspec; Pout = r.Pout; G = r.G; Ein = r.Ein; Eout = r.Eout; }
   const sin = FN.stats(pulse.t, Pin, dt), sout = FN.stats(pulse.t, Pout, dt);
-  /* cumulative extracted fraction (for readout / table) */
   const extracted = new Float64Array(N); let acc = 0;
   for (let i = 0; i < N; i++) { acc += (Pout[i] - Pin[i]) * dt; extracted[i] = Estored > 0 ? acc / Estored : NaN; }
   /* z evolution */
   const M = Math.max(2, Math.min(41, Math.round(S.slices))), evo = [];
   for (let j = 0; j < M; j++) { const f = j / (M - 1); evo.push(f === 0 ? Pin : f === 1 ? Pout : FN.forward(Pin, dt, Esat, Math.exp(f * lnG0)).Pout); }
-  /* energy sweep over the specified pulse's energy */
-  const Espec = S.mode === 'inv' ? Eout : Ein;
+  /* energy sweep over the specified pulse's energy (inversion held fixed) */
+  const Espec = inv ? Eout : Ein;
   let lo = Math.log10(Esat * 1e-3), hi = Math.log10(Esat * 30);
   if (Espec > 0) { lo = Math.min(lo, Math.log10(Espec) - 0.3); hi = Math.max(hi, Math.log10(Espec) + 0.3); }
   const nsw = 90, sw = { E: [], gain: [], ratio: [], eta: [] }, fw0 = FN.fwhm(pulse.t, pulse.s), tmp = new Float64Array(N);
@@ -818,81 +1095,89 @@ function compute() {
     const E = Math.pow(10, lo + (hi - lo) * q / (nsw - 1)), k = E / Eunit;
     for (let i = 0; i < N; i++) tmp[i] = pulse.s[i] * k;
     let r, ein, eout, w;
-    if (S.mode === 'inv') { r = FN.inverse(tmp, dt, Esat, G0); ein = r.Ein; eout = E; w = FN.fwhm(pulse.t, r.Pin) / fw0; }
+    if (inv) { r = FN.inverse(tmp, dt, Esat, G0); ein = r.Ein; eout = E; w = FN.fwhm(pulse.t, r.Pin) / fw0; }
     else { r = FN.forward(tmp, dt, Esat, G0); ein = E; eout = r.Eout; w = FN.fwhm(pulse.t, r.Pout) / fw0; }
     sw.E.push(E); sw.gain.push(dB(eout / ein)); sw.ratio.push(w); sw.eta.push(Estored > 0 ? 100 * (eout - ein) / Estored : NaN);
   }
-  R = { preset, med, Esat, G0, lnG0, Estored, kind, customErr, cal, t: pulse.t, dt, s: pulse.s, Pin, Pout, G, Ein, Eout, sin, sout, extracted, evo, sw, T };
+  R = { amp, Esat, gainDb, G0, lnG0, Estored, kind, customErr, cal, t: pulse.t, dt, s: pulse.s, Pin, Pout, G, Ein, Eout, sin, sout, extracted, evo, sw, T };
 }
 
 /* ---------- rendering ---------- */
 let hoverT = NaN;
 function cssTok(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function firstAbove(P, frac) { const m = P[FN.argmax(P)] * frac; let i = 0; while (i < P.length - 1 && P[i] < m) i++; return i; }
+function lastAbove(P, frac) { const m = P[FN.argmax(P)] * frac; let i = P.length - 1; while (i > 0 && P[i] < m) i--; return i; }
 function renderText() {
-  const inv = S.mode === 'inv', tu = TUL[S.tUnit];
+  const inv = S.mode === 'inv', tu = TUL[S.tUnit], A = R.amp;
   $('h-pulse').textContent = inv ? 'Target output pulse' : 'Input pulse';
   $('chipIn').textContent = inv ? 'computed' : 'specified'; $('chipIn').className = 'chip' + (inv ? '' : ' spec');
   $('chipOut').textContent = inv ? 'specified' : 'computed'; $('chipOut').className = 'chip' + (inv ? ' spec' : '');
   $('sweepTitle').textContent = inv ? 'Output-energy sweep' : 'Input-energy sweep';
   $('sweepSub').textContent = inv ? 'Same target shape and gain, output energy swept. The dot marks the current setting.' : 'Same input shape and gain, input energy swept. The dot marks the current setting.';
   $('swRatioTitle').textContent = inv ? 'FWHM ratio, required input / output' : 'FWHM ratio, out / in';
-  /* amplifier derived */
-  const m = R.med, tauTxt = R.preset && R.preset.tau ? sig(R.preset.tau * 1e3) + ' ms' : 'n/a';
-  $('ampDerived').innerHTML =
-    `<span>Photon energy hν</span><b>${sig(FN.H * FN.C0 / (S.lam * 1e-9) / 1.602176634e-19)} eV</b>` +
-    `<span>Saturation fluence J<sub>sat</sub></span><b>${S.esatDirectOn ? '—' : sig(m.Jsat / 1e4) + ' J/cm²'}</b>` +
-    `<span>Effective area A<sub>eff</sub></span><b>${sig(m.Aeff * 1e12)} µm²</b>` +
-    `<span>Saturation energy E<sub>sat</sub></span><b>${fmtE(R.Esat)}</b>` +
-    `<span>Small-signal gain G<sub>0</sub></span><b>${sig(R.G0, 4)}×</b>` +
-    `<span>Extractable stored energy E<sub>sat</sub> ln G<sub>0</sub></span><b>${fmtE(R.Estored)}</b>` +
-    `<span>Upper-state lifetime (preset)</span><b>${tauTxt}</b>`;
-  /* KPIs */
+  $('evoSub').textContent = A.L ? `Pulse after a fraction z/L of the ${sig(A.L)} m fibre, assuming uniform small-signal gain per unit length.` : 'Pulse after a fraction z/L of the gain, assuming uniform small-signal gain per unit length.';
+  /* derived box */
   const net = dB(R.Eout / R.Ein), eta = R.Estored > 0 ? (R.Eout - R.Ein) / R.Estored : NaN;
+  const gLead = dB(R.G[firstAbove(R.Pin, 1e-3)]), gTrail = dB(R.G[lastAbove(R.Pin, 1e-3)]);
+  const uIn = R.Ein / R.Esat, drive = R.G0 * uIn;
+  const rows = A.info.map(r => r[0] === 'sep' ? '<span class="sep"></span>' : `<span>${r[0]}</span><b>${r[1]}</b>`);
+  rows.push('<span class="sep"></span>');
+  rows.push(`<span>Saturation drive G<sub>0</sub>E<sub>in</sub>/E<sub>sat</sub></span><b>${sig(drive)}, ${drive < 0.3 ? 'weak' : drive < 3 ? 'onset' : drive < 30 ? 'saturated' : 'deep'}</b>`);
+  rows.push(`<span>Input fluence u = E<sub>in</sub>/E<sub>sat</sub></span><b>${sig(uIn)}</b>`);
+  rows.push(`<span>Gain, leading → trailing edge</span><b>${sig(gLead, 3)} → ${sig(gTrail, 3)} dB</b>`);
+  $('ampDerived').innerHTML = rows.join('');
+  /* KPIs */
   $('kpiGain').innerHTML = `${sig(net, 3)}<small>dB</small>`;
-  $('kpiGainS').textContent = `small-signal ${sig(S.gainDb, 3)} dB, compressed by ${sig(S.gainDb - net, 2)} dB`;
+  $('kpiGainS').textContent = `small-signal ${sig(R.gainDb, 3)} dB, compressed by ${sig(R.gainDb - net, 2)} dB`;
+  const wr = R.sout.fwhm / R.sin.fwhm;
+  $('kpiW').innerHTML = `${sig(R.sin.fwhm / TU[S.tUnit])}<span class="arrow">→</span>${sig(R.sout.fwhm / TU[S.tUnit])}<small>${tu}</small>`;
+  $('kpiWS').textContent = `×${sig(wr)}; peak moves ${sig((R.sout.tpk - R.sin.tpk) / TU[S.tUnit], 2)} ${tu}; rise ${fmtT(R.sin.rise)} → ${fmtT(R.sout.rise)}`;
   $('kpiEta').innerHTML = Number.isFinite(eta) ? `${sig(100 * eta, 3)}<small>%</small>` : '—';
-  $('kpiEtaS').textContent = Number.isFinite(eta) ? `${fmtE(R.Eout - R.Ein)} of ${fmtE(R.Estored)} stored` : (S.gainDb <= 0 ? 'no stored energy at G₀ ≤ 0 dB' : '');
+  $('kpiEtaS').textContent = Number.isFinite(eta) ? `${fmtE(R.Eout - R.Ein)} of ${fmtE(R.Estored)} stored` : (R.gainDb <= 0 ? 'no stored energy at G₀ ≤ 0 dB' : '');
   $('kpiEk').textContent = inv ? 'Required input energy' : 'Output energy';
   $('kpiE').textContent = inv ? fmtE(R.Ein) : fmtE(R.Eout);
-  $('kpiES').textContent = inv ? `for ${fmtE(R.Eout)} out, peak ${fmtPow(R.sin.Ppk)}` : `from ${fmtE(R.Ein)} in, peak ${fmtPow(R.sout.Ppk)}`;
+  let es = inv ? `for ${fmtE(R.Eout)} out, peak ${fmtPow(R.sin.Ppk)}` : `from ${fmtE(R.Ein)} in, peak ${fmtPow(R.sout.Ppk)}`;
+  if (A.pump) es += `; ${fmtPow(R.Eout * A.pump.f.frep)} average`;
+  $('kpiES').textContent = es;
+  $('pulseSub').textContent = `FWHM ${fmtT(R.sin.fwhm)} in → ${fmtT(R.sout.fwhm)} out. Hover or touch for a readout.`;
   /* warnings */
-  const W = [];
+  const W = [...A.warn];
   if (R.customErr) W.push(['crit', R.customErr]);
-  if (S.gainDb < 0) W.push(['info', 'G₀ is below 0 dB: the medium absorbs. The same equations then describe a saturable absorber bleaching, with E_sat as its saturation energy.']);
-  if (R.preset && R.preset.tau && R.T > 0.1 * R.preset.tau) W.push(['warn', `Pulse FWHM ${fmtT(R.T)} is not short against the ${sig(R.preset.tau * 1e6)} µs upper-state lifetime of this medium; the model ignores pumping and decay during the pulse.`]);
+  if (R.gainDb < 0) W.push(['info', 'G₀ is below 0 dB: the medium absorbs. The same equations then describe a saturable absorber bleaching, with E_sat as its saturation energy.']);
+  if (A.tau && R.T > 0.1 * A.tau) W.push(['warn', `Pulse FWHM ${fmtT(R.T)} is not short against the ${sig(A.tau * 1e6)} µs upper-state lifetime; the model ignores pumping and decay during the pulse.`]);
   if (R.T < 1e-12) W.push(['warn', 'Pulses shorter than about 1 ps leave the rate-equation regime: coherent effects, finite gain bandwidth and dispersion are not in this model.']);
-  if (!inv && S.gainDb > 0 && S.gainDb - net > 10) W.push(['info', `Deep saturation: the gain is compressed by ${sig(S.gainDb - net, 2)} dB. The leading edge sees ${sig(S.gainDb, 3)} dB while the trailing edge sees ${sig(dB(R.G[lastAbove(R.Pin, 1e-3)]), 2)} dB.`]);
+  if (R.gainDb > 0 && drive < 0.3) W.push(['info', `Weak saturation: G₀·E_in = ${sig(drive, 2)} E_sat, so the gain barely moves during the pulse and the shape hardly changes. Distortion starts around G₀·E_in ≈ E_sat (${fmtE(R.Esat / R.G0)} in here); raise the input energy, the inversion or the fibre length, or read the sweep below.`]);
+  if (!inv && R.gainDb > 0 && R.gainDb - net > 10) W.push(['info', `Deep saturation: the gain is compressed by ${sig(R.gainDb - net, 2)} dB. The leading edge sees ${sig(gLead, 3)} dB while the trailing edge sees ${sig(gTrail, 2)} dB.`]);
   if (inv && R.Estored > 0 && R.Eout > R.Estored) W.push(['warn', `The requested output (${fmtE(R.Eout)}) exceeds the extractable stored energy (${fmtE(R.Estored)}); the seed must supply ${fmtE(R.Ein)} and the amplifier only adds ${sig(net, 2)} dB.`]);
   if (inv && R.Ein > 0.5 * R.Eout && !(R.Estored > 0 && R.Eout > R.Estored)) W.push(['info', `Net gain is only ${sig(net, 2)} dB: most of the output energy comes from the seed.`]);
-  if (R.sin.Ppk > 0 && R.sin.fwhm < 20 * R.dt) W.push(['warn', 'The pulse is resolved by fewer than 20 samples at half maximum; widen the shape support or use a simpler shape for accurate widths.']);
-  $('warnings').innerHTML = W.map(([lvl, txt]) => `<li class="${lvl}"><span class="ico">${lvl === 'info' ? 'i' : '!'}</span><span>${txt}</span></li>`).join('');
+  if (R.sin.Ppk > 0 && R.sin.fwhm < 20 * R.dt) W.push(['warn', 'The pulse is resolved by fewer than 20 samples at half maximum; use a simpler shape for accurate widths.']);
+  if (A.pump && A.pump.f.Pp > 0) {
+    const conv = (R.Eout - R.Ein) * A.pump.f.frep / A.pump.f.Pp;
+    W.push(['info', `Pump estimate: pre-pulse inversion ${sig(A.pump.n2)} (${A.pump.limit}), ${sig(A.pump.Pabs)} W absorbed, ${sig(100 * conv, 2)} % of the pump ends up in the pulse train (${fmtPow((R.Eout - R.Ein) * A.pump.f.frep)} average extracted). A lumped estimate without ASE or position dependence; use the Python solver for design values.`]);
+  }
+  $('warnings').innerHTML = W.map(([lvl, txt]) => `<li class="${lvl}"><span class="ico">${lvl === 'info' ? 'i' : '!'}</span><span>${esc(txt)}</span></li>`).join('');
   /* comparison table */
-  const rows = [
+  const trs = [
     ['Energy', fmtE(R.sin.E), fmtE(R.sout.E), `${sig(dB(R.sout.E / R.sin.E), 3)} dB`],
     ['Peak power', fmtPow(R.sin.Ppk), fmtPow(R.sout.Ppk), `×${sig(R.sout.Ppk / R.sin.Ppk, 3)}`],
-    ['FWHM', fmtT(R.sin.fwhm), fmtT(R.sout.fwhm), `×${sig(R.sout.fwhm / R.sin.fwhm, 3)}`],
+    ['FWHM', fmtT(R.sin.fwhm), fmtT(R.sout.fwhm), `×${sig(wr, 3)}`],
     ['Rise 10–90 %', fmtT(R.sin.rise), fmtT(R.sout.rise), `×${sig(R.sout.rise / R.sin.rise, 3)}`],
     ['Fall 90–10 %', fmtT(R.sin.fall), fmtT(R.sout.fall), `×${sig(R.sout.fall / R.sin.fall, 3)}`],
     ['Peak time', fmtT(R.sin.tpk), fmtT(R.sout.tpk), `${sig((R.sout.tpk - R.sin.tpk) / TU[S.tUnit], 3)} ${tu}`],
     ['Centroid', fmtT(R.sin.centroid), fmtT(R.sout.centroid), `${sig((R.sout.centroid - R.sin.centroid) / TU[S.tUnit], 3)} ${tu}`],
-    ['Gain at the leading edge / trailing edge', '', '', `${sig(dB(R.G[firstAbove(R.Pin, 1e-3)]), 3)} dB / ${sig(dB(R.G[lastAbove(R.Pin, 1e-3)]), 3)} dB`],
+    ['Gain at the leading edge / trailing edge', '', '', `${sig(gLead, 3)} dB / ${sig(gTrail, 3)} dB`],
   ];
-  $('cmpBody').innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td class="num">${r[1]}</td><td class="num">${r[2]}</td><td class="num">${r[3]}</td></tr>`).join('');
-  /* data table */
+  $('cmpBody').innerHTML = trs.map(r => `<tr><td>${r[0]}</td><td class="num">${r[1]}</td><td class="num">${r[2]}</td><td class="num">${r[3]}</td></tr>`).join('');
   $('dtT').textContent = `t (${tu})`;
   const N = R.t.length, step = Math.max(1, Math.floor(N / 24)), tr = [];
   for (let i = 0; i < N; i += step) tr.push(`<tr><td class="num">${sig(R.t[i] / TU[S.tUnit], 4)}</td><td class="num">${sig(R.Pin[i])}</td><td class="num">${sig(R.Pout[i])}</td><td class="num">${sig(dB(R.G[i]), 4)}</td><td class="num">${sig(100 * R.extracted[i])}</td></tr>`);
   $('dataBody').innerHTML = tr.join('');
 }
-function firstAbove(P, frac) { const m = P[FN.argmax(P)] * frac; let i = 0; while (i < P.length - 1 && P[i] < m) i++; return i; }
-function lastAbove(P, frac) { const m = P[FN.argmax(P)] * frac; let i = P.length - 1; while (i > 0 && P[i] < m) i--; return i; }
-
 function renderCharts() {
   const cin = cssTok('--c-in'), cout = cssTok('--c-out'), cg = cssTok('--c-gain'), r0 = cssTok('--ramp-0'), r1 = cssTok('--ramp-1');
   const tu = TUL[S.tUnit], N = R.t.length, xs = new Float64Array(N);
   for (let i = 0; i < N; i++) xs[i] = R.t[i] / TU[S.tUnit];
   const inv = S.mode === 'inv';
-  /* pulse chart */
   let yin = R.Pin, yout = R.Pout, ylabel = 'power (W)';
   if (S.normalize) { yin = new Float64Array(N); yout = new Float64Array(N); for (let i = 0; i < N; i++) { yin[i] = R.Pin[i] / R.sin.Ppk; yout[i] = R.Pout[i] / R.sout.Ppk; } ylabel = 'power / peak'; }
   let hover = null;
@@ -910,23 +1195,20 @@ function renderCharts() {
     labels: [{ x: xs[ipk], y: yin[ipk], text: 'in', dx: -22 }, { x: xs[opk], y: yout[opk], text: 'out', dx: 6 }],
     hover,
   });
-  /* gain chart */
   const gdb = new Float64Array(N); for (let i = 0; i < N; i++) gdb[i] = dB(R.G[i]);
   drawChart($('cvGain'), {
     xlabel: `time (${tu})`, ylabel: 'instantaneous gain (dB)',
     series: [{ x: xs, y: gdb, color: cg, width: 2 }],
-    ylim: [Math.min(0, S.gainDb) - 1, Math.max(0, S.gainDb) + 1],
+    ylim: [Math.min(0, R.gainDb) - 1, Math.max(0, R.gainDb) + 1],
     hover: hover ? { x: hover.x } : null,
   });
-  /* evolution */
   const M = R.evo.length, es = [];
   for (let j = 0; j < M; j++) {
     const P = R.evo[j]; let y = P;
     if (S.evoNorm) { const pk = P[FN.argmax(P)] || 1; y = new Float64Array(N); for (let i = 0; i < N; i++) y[i] = P[i] / pk; }
     es.push({ x: xs, y, color: mixHex(r0, r1, j / (M - 1)), width: j === M - 1 ? 2.2 : 1.4 });
   }
-  drawChart($('cvEvo'), { xlabel: `time (${tu})`, ylabel: S.evoNorm ? 'power / peak of slice' : 'power (W)', logy: !S.evoNorm && S.logy, logFloor: 1e-6, series: es, gradient: { c0: mixHex(r0, r1, 0), c1: mixHex(r0, r1, 1), l0: 'z = 0', l1: 'z = L' } });
-  /* sweep small multiples */
+  drawChart($('cvEvo'), { xlabel: `time (${tu})`, ylabel: S.evoNorm ? 'power / peak of slice' : 'power (W)', logy: !S.evoNorm && S.logy, logFloor: 1e-6, series: es, gradient: { c0: mixHex(r0, r1, 0), c1: mixHex(r0, r1, 1), l0: 'z = 0', l1: R.amp.L ? `z = L = ${sig(R.amp.L)} m` : 'z = L' } });
   const Eu = EU[S.eUnit], ex = R.sw.E.map(e => e / Eu), Ecur = (inv ? R.Eout : R.Ein) / Eu, xl = `${inv ? 'output' : 'input'} energy (${EUL[S.eUnit]})`;
   const net = dB(R.Eout / R.Ein), eta = R.Estored > 0 ? 100 * (R.Eout - R.Ein) / R.Estored : NaN;
   const wr = inv ? R.sin.fwhm / R.sout.fwhm : R.sout.fwhm / R.sin.fwhm;
@@ -935,7 +1217,11 @@ function renderCharts() {
   drawChart($('cvSw3'), { ml: 46, xlabel: xl, logx: true, series: [{ x: ex, y: R.sw.eta, color: cg }], marker: { x: Ecur, y: eta, color: cg } });
 }
 function updateVisibility() {
-  const k = S.shape;
+  const k = S.shape, fibre = S.ampMode === 'fibre';
+  $('fibreBlock').style.display = fibre ? '' : 'none';
+  $('simpleBlock').style.display = fibre ? 'none' : '';
+  $('invBlock').style.display = S.gainFrom === 'pump' ? 'none' : '';
+  $('pumpBlock').style.display = S.gainFrom === 'pump' ? '' : 'none';
   $('row-sgOrder').style.display = k === 'supergauss' ? '' : 'none';
   $('row-edgePct').style.display = k === 'square' ? '' : 'none';
   $('row-fallRise').style.display = k === 'qswitch' ? '' : 'none';
@@ -958,17 +1244,30 @@ function update(fromForm = true) {
 }
 
 /* ---------- wiring ---------- */
+function fillSelect(id, list) { const sel = $(id); for (const p of list) { const o = document.createElement('option'); o.value = p.id; o.textContent = p.name; sel.appendChild(o); } }
+function applyPreset(id) {
+  const p = PRESETS.find(q => q.id === id); if (!p || p.id === 'custom') return;
+  $('lam').value = p.lam; $('sa').value = p.sa; $('se').value = p.se; $('mfd').value = p.mfd;
+}
+function applyFibre(id) {
+  const p = FIBRES.find(q => q.id === id); if (!p || p.id === 'custom') return;
+  for (const k of FIBRE_KEYS) $(k).value = p[k];
+  $('n2Range').value = p.n2;
+}
 function init() {
-  const sel = $('preset');
-  for (const p of PRESETS) { const o = document.createElement('option'); o.value = p.id; o.textContent = p.name; sel.appendChild(o); }
+  fillSelect('preset', PRESETS); fillSelect('fibrePreset', FIBRES);
   load(); writeForm();
   document.querySelectorAll('input, select, textarea').forEach(el => {
     if (el.id === 'customFile') return;
     el.addEventListener('input', () => {
       if (el.id === 'gainRange') $('gainDb').value = el.value;
       if (el.id === 'gainDb') $('gainRange').value = el.value;
+      if (el.id === 'n2Range') $('n2').value = el.value;
+      if (el.id === 'n2') $('n2Range').value = el.value;
       if (['lam', 'sa', 'se', 'mfd'].includes(el.id)) $('preset').value = 'custom';
+      if (FIBRE_KEYS.includes(el.id) && el.id !== 'n2') $('fibrePreset').value = 'custom';
       if (el.id === 'preset') applyPreset(el.value);
+      if (el.id === 'fibrePreset') applyFibre(el.value);
       update();
     });
   });
@@ -989,10 +1288,6 @@ function init() {
   if (window.matchMedia) { const mq = window.matchMedia('(prefers-color-scheme: dark)'); if (mq.addEventListener) mq.addEventListener('change', () => R && renderCharts()); }
   new MutationObserver(() => R && renderCharts()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   update(true);
-}
-function applyPreset(id) {
-  const p = PRESETS.find(q => q.id === id); if (!p || p.id === 'custom') return;
-  $('lam').value = p.lam; $('sa').value = p.sa; $('se').value = p.se; $('mfd').value = p.mfd;
 }
 function copyCsv() {
   if (!R) return;
